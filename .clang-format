@@ -1,0 +1,11 @@
+---
+BasedOnStyle: Google
+AccessModifierOffset: "0"
+AlignConsecutiveMacros: "true"
+AlignEscapedNewlines: Left
+AllowShortCaseLabelsOnASingleLine: "false"
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: "false"
+ReflowComments: "false"
+SortIncludes: "false"
