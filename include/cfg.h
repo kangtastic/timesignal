@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include "log.h"
+
 #include <alsa/asoundlib.h>
 
 #include <stdint.h>
@@ -62,5 +64,6 @@ typedef struct tsig_cfg {
   int verbosity; /** Verbosity level. */
 } tsig_cfg_t;
 
-tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *, int, char *[]);
+tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *, tsig_log_t *, int, char *[]);
+const char *tsig_cfg_station_name(tsig_cfg_station_t);
 void tsig_cfg_help(void);

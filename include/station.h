@@ -11,6 +11,7 @@
 
 #include "cfg.h"
 #include "iir.h"
+#include "log.h"
 
 #include <alsa/asoundlib.h>
 
@@ -44,8 +45,10 @@ typedef struct tsig_station {
   tsig_iir_t iir; /** IIR filter sine wave generator. */
   uint32_t freq;  /** Target waveform frequency. */
   double gain;    /** Actual current gain in [0.0-1.0]. */
+
+  tsig_log_t *log; /** Logging context. */
 } tsig_station_t;
 
 void tsig_station_cb(void *, double *, snd_pcm_uframes_t);
-void tsig_station_init(tsig_station_t *, tsig_cfg_station_t, int32_t, int16_t,
-                       bool, bool, uint32_t);
+void tsig_station_init(tsig_station_t *, tsig_log_t *, tsig_cfg_station_t,
+                       int32_t, int16_t, bool, bool, uint32_t);

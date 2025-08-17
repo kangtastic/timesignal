@@ -10,6 +10,7 @@
 #pragma once
 
 #include "cfg.h"
+#include "log.h"
 
 #include <alsa/asoundlib.h>
 
@@ -37,8 +38,10 @@ typedef struct tsig_alsa {
 
   snd_pcm_uframes_t start_threshold; /** Start threshold. */
   snd_pcm_uframes_t avail_min;       /** Fill threshold. */
+
+  tsig_log_t *log; /** Logging context. */
 } tsig_alsa_t;
 
-int tsig_alsa_init(tsig_alsa_t *, tsig_cfg_t *);
+int tsig_alsa_init(tsig_alsa_t *, tsig_cfg_t *, tsig_log_t *);
 int tsig_alsa_loop(tsig_alsa_t *, tsig_alsa_cb_t, void *);
 int tsig_alsa_deinit(tsig_alsa_t *);

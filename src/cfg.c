@@ -9,6 +9,7 @@
 
 #include "cfg.h"
 #include "defaults.h"
+#include "log.h"
 
 #include <alsa/asoundlib.h>
 
@@ -218,6 +219,14 @@ static bool cfg_match(const cfg_match_t cands[], const char *str,
   return false;
 }
 
+/** Match a value to a string. */
+static const char *cfg_match_value(const cfg_match_t cands[], long value) {
+  for (int i = 0; cands[i].str; i++)
+    if (value == cands[i].value)
+      return cands[i].str;
+  return NULL;
+}
+
 /** Parse a string in [[[+-]HH:]mm:]ss[.SSS] format. */
 static bool cfg_parse_offset(const char *str, long *out_msecs) {
   const char *l = NULL;
@@ -317,16 +326,39 @@ static bool cfg_strtol(const char *str, long *out_n) {
   return true;
 }
 
+#ifdef TSIG_DEBUG
+/** Print initialized program configuration. */
+static void cfg_print(tsig_cfg_t *cfg, tsig_log_t *log) {
+  const char *station = cfg_match_value(cfg_stations, cfg->station);
+  tsig_log_dbg("tsig_cfg_t %p = {", cfg);
+  tsig_log_dbg("  .offset     = %d,", cfg->offset);
+  tsig_log_dbg("  .station    = %s,", station);
+  tsig_log_dbg("  .dut1       = %hu,", cfg->dut1);
+  tsig_log_dbg("  .device     = \"%s\",", cfg->device);
+  tsig_log_dbg("  .format     = %s,", snd_pcm_format_name(cfg->format));
+  tsig_log_dbg("  .rate       = %u,", cfg->rate);
+  tsig_log_dbg("  .channels   = %hu,", cfg->channels);
+  tsig_log_dbg("  .smooth     = %d,", cfg->smooth);
+  tsig_log_dbg("  .ultrasound = %d,", cfg->ultrasound);
+  tsig_log_dbg("  .log_file   = \"%s\",", cfg->log_file);
+  tsig_log_dbg("  .syslog     = %d,", cfg->syslog);
+  tsig_log_dbg("  .verbosity  = %d,", cfg->verbosity);
+  tsig_log_dbg("};");
+}
+#endif /* TSIG_DEBUG */
+
 /**
  * Initialize program configuration.
  *
  * @param cfg Uninitialized program configuration.
+ * @param log Initialized logging context. Will be initialized further.
  * @param argc Command-line argument count.
  * @param argv Command-line argument vector.
  * @return Return code indicating whether initialization was successful,
  *  and if so, whether the user printed the help message.
  */
-tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, int argc, char *argv[]) {
+tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
+                                     char *argv[]) {
   bool has_error = false;
   bool help = false;
   long tmp;
@@ -341,21 +373,20 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, int argc, char *argv[]) {
 
     has_error = true;
 
-    /* TODO: Logging. */
+    /* NOTE: Logging while parsing cmdline args is to console only. */
     switch (opt) {
       case 'o':
         if (!cfg_parse_offset(optarg, &tmp)) {
-          fprintf(stderr, "invalid offset \"%s\"\n", optarg);
+          tsig_log_err("invalid offset \"%s\"", optarg);
         } else if (!(cfg_offset_min < tmp && tmp < cfg_offset_max)) {
           const char *sign = tmp < 0 ? "-" : "";
           if (tmp < 0)
             tmp = -tmp;
-          fprintf(stderr,
-                  "offset %s%.02ld:%.02ld:%.02ld.%.03ld must be between "
-                  "-23:59:59.999 and 23:59:59.999\n",
-                  sign, tmp / cfg_msecs_hour,
-                  (tmp / cfg_msecs_min) % cfg_mins_hour,
-                  (tmp / cfg_msecs_sec) % cfg_secs_min, tmp % cfg_msecs_sec);
+          tsig_log_err(
+              "offset %s%.02ld:%.02ld:%.02ld.%.03ld must be between "
+              "-23:59:59.999 and 23:59:59.999",
+              sign, tmp / cfg_msecs_hour, (tmp / cfg_msecs_min) % cfg_mins_hour,
+              (tmp / cfg_msecs_sec) % cfg_secs_min, tmp % cfg_msecs_sec);
         } else {
           cfg->offset = (int32_t)tmp;
           has_error = false;
@@ -363,7 +394,7 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, int argc, char *argv[]) {
         break;
       case 's':
         if (!cfg_match(cfg_stations, optarg, &tmp)) {
-          fprintf(stderr, "invalid station \"%s\"\n", optarg);
+          tsig_log_err("invalid station \"%s\"", optarg);
         } else {
           cfg->station = (tsig_cfg_station_t)tmp;
           has_error = false;
@@ -371,10 +402,10 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, int argc, char *argv[]) {
         break;
       case 'd':
         if (!cfg_strtol(optarg, &tmp)) {
-          fprintf(stderr, "invalid dut1 \"%s\"\n", optarg);
+          tsig_log_err("invalid dut1 \"%s\"", optarg);
         } else if (!(cfg_dut1_min < tmp && tmp < cfg_dut1_max)) {
-          fprintf(stderr, "dut1 %ld must be between %ld and %ld\n", tmp,
-                  cfg_dut1_min + 1, cfg_dut1_max - 1);
+          tsig_log_err("dut1 %ld must be between %ld and %ld", tmp,
+                       cfg_dut1_min + 1, cfg_dut1_max - 1);
         } else {
           cfg->dut1 = (int16_t)tmp;
           has_error = false;
@@ -386,7 +417,7 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, int argc, char *argv[]) {
         break;
       case 'f':
         if (!cfg_match(cfg_formats, optarg, &tmp)) {
-          fprintf(stderr, "invalid format \"%s\"\n", optarg);
+          tsig_log_err("invalid format \"%s\"", optarg);
         } else {
           cfg->format = (snd_pcm_format_t)tmp;
           has_error = false;
@@ -394,7 +425,7 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, int argc, char *argv[]) {
         break;
       case 'r':
         if (!cfg_match(cfg_rates, optarg, &tmp)) {
-          fprintf(stderr, "invalid rate \"%s\"\n", optarg);
+          tsig_log_err("invalid rate \"%s\"", optarg);
         } else {
           cfg->rate = (uint32_t)tmp;
           has_error = false;
@@ -402,10 +433,10 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, int argc, char *argv[]) {
         break;
       case 'c':
         if (!cfg_strtol(optarg, &tmp)) {
-          fprintf(stderr, "invalid channels \"%s\"\n", optarg);
+          tsig_log_err("invalid channels \"%s\"", optarg);
         } else if (!(cfg_channels_min < tmp && tmp < cfg_channels_max)) {
-          fprintf(stderr, "channels %ld must be between %ld and %ld\n", tmp,
-                  cfg_channels_min + 1, cfg_channels_max - 1);
+          tsig_log_err("channels %ld must be between %ld and %ld", tmp,
+                       cfg_channels_min + 1, cfg_channels_max - 1);
         } else {
           cfg->channels = (uint16_t)tmp;
           has_error = false;
@@ -443,10 +474,26 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, int argc, char *argv[]) {
 
   if (help || has_error)
     tsig_cfg_help();
+  else
+    tsig_log_finish_init(log, cfg->log_file, cfg->syslog, cfg->verbosity);
+
+#ifdef TSIG_DEBUG
+  cfg_print(cfg, log);
+#endif /* TSIG_DEBUG */
 
   return has_error ? TSIG_CFG_INIT_FAIL
          : help    ? TSIG_CFG_INIT_HELP
                    : TSIG_CFG_INIT_OK;
+}
+
+/**
+ * Match a time station ID to its name.
+ *
+ * @param station_id Time station ID.
+ * @return String containing the time station's name.
+ */
+const char *tsig_cfg_station_name(tsig_cfg_station_t station_id) {
+  return cfg_match_value(cfg_stations, station_id);
 }
 
 /** Print help message to stderr. */

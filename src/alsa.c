@@ -13,7 +13,6 @@
 #include <alsa/asoundlib.h>
 
 #include <stdbool.h>
-#include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -43,6 +42,7 @@ static const snd_pcm_format_t alsa_format[] = {
 
 /** Set hardware parameters. */
 static int alsa_set_hw_params(tsig_alsa_t *alsa, tsig_cfg_t *cfg) {
+  tsig_log_t *log = alsa->log;
   snd_pcm_hw_params_t *params;
   snd_pcm_t *pcm = alsa->pcm;
   snd_pcm_format_t format;
@@ -54,16 +54,16 @@ static int alsa_set_hw_params(tsig_alsa_t *alsa, tsig_cfg_t *cfg) {
 
   err = snd_pcm_hw_params_any(pcm, params);
   if (err < 0) {
-    fprintf(stderr, "failed to get hw params: %s\n", snd_strerror(err));
+    tsig_log_err("failed to get hw params: %s", snd_strerror(err));
     return err;
   }
 
   err =
       snd_pcm_hw_params_set_access(pcm, params, SND_PCM_ACCESS_RW_INTERLEAVED);
   if (err < 0) {
-    fprintf(stderr, "failed to set access %s: %s\n",
-            snd_pcm_access_name(SND_PCM_ACCESS_RW_INTERLEAVED),
-            snd_strerror(err));
+    tsig_log_err("failed to set access %s: %s",
+                 snd_pcm_access_name(SND_PCM_ACCESS_RW_INTERLEAVED),
+                 snd_strerror(err));
     return err;
   }
   alsa->access = SND_PCM_ACCESS_RW_INTERLEAVED;
@@ -73,9 +73,9 @@ static int alsa_set_hw_params(tsig_alsa_t *alsa, tsig_cfg_t *cfg) {
   if (err < 0) {
     for (int i = 0; alsa_format[i] != SND_PCM_FORMAT_LAST; i++) {
       if (!snd_pcm_hw_params_set_format(pcm, params, alsa_format[i])) {
-        fprintf(stderr, "failed to set format %s, fallback to %s\n",
-                snd_pcm_format_name(format),
-                snd_pcm_format_name(alsa_format[i]));
+        tsig_log_note("failed to set format %s, fallback to %s",
+                      snd_pcm_format_name(format),
+                      snd_pcm_format_name(alsa_format[i]));
         format = alsa_format[i];
         err = 0;
         break;
@@ -83,8 +83,8 @@ static int alsa_set_hw_params(tsig_alsa_t *alsa, tsig_cfg_t *cfg) {
     }
   }
   if (err < 0) {
-    fprintf(stderr, "failed to set format %s: %s\n",
-            snd_pcm_format_name(format), snd_strerror(err));
+    tsig_log_err("failed to set format %s: %s", snd_pcm_format_name(format),
+                 snd_strerror(err));
     return err;
   }
   alsa->format = format;
@@ -93,14 +93,14 @@ static int alsa_set_hw_params(tsig_alsa_t *alsa, tsig_cfg_t *cfg) {
   err = snd_pcm_hw_params_set_rate_near(pcm, params, &val, NULL);
   if (val != cfg->rate) {
     if (TSIG_CFG_RATE_44100 <= val && val <= TSIG_CFG_RATE_384000)
-      fprintf(stderr, "failed to set rate near %u, fallback to %u\n", cfg->rate,
-              val);
+      tsig_log_note("failed to set rate near %u, fallback to %u", cfg->rate,
+                    val);
     else
       err = -EINVAL;
   }
   if (err < 0) {
-    fprintf(stderr, "failed to set rate near %u: %s\n", cfg->rate,
-            snd_strerror(err));
+    tsig_log_err("failed to set rate near %u: %s", cfg->rate,
+                 snd_strerror(err));
     return err;
   }
   alsa->rate = val;
@@ -108,11 +108,11 @@ static int alsa_set_hw_params(tsig_alsa_t *alsa, tsig_cfg_t *cfg) {
   val = cfg->channels;
   err = snd_pcm_hw_params_set_channels_near(pcm, params, &val);
   if (val != cfg->channels)
-    fprintf(stderr, "failed to set channels near %hu, fallback to %u\n",
-            cfg->channels, val);
+    tsig_log_note("failed to set channels near %hu, fallback to %u",
+                  cfg->channels, val);
   if (err < 0) {
-    fprintf(stderr, "failed to set channels near %hu: %s\n", cfg->channels,
-            snd_strerror(err));
+    tsig_log_err("failed to set channels near %hu: %s", cfg->channels,
+                 snd_strerror(err));
     return err;
   }
   alsa->channels = val;
@@ -120,13 +120,13 @@ static int alsa_set_hw_params(tsig_alsa_t *alsa, tsig_cfg_t *cfg) {
   val = alsa_buffer_time;
   err = snd_pcm_hw_params_set_buffer_time_near(pcm, params, &val, NULL);
   if (err < 0) {
-    fprintf(stderr, "failed to set buffer time near %u: %s\n", alsa_buffer_time,
-            snd_strerror(err));
+    tsig_log_err("failed to set buffer time near %u: %s", alsa_buffer_time,
+                 snd_strerror(err));
     return err;
   }
   err = snd_pcm_hw_params_get_buffer_size(params, &size);
   if (err < 0) {
-    fprintf(stderr, "failed to get buffer size: %s\n", snd_strerror(err));
+    tsig_log_err("failed to get buffer size: %s", snd_strerror(err));
     return err;
   }
   alsa->buffer_size = size;
@@ -134,20 +134,20 @@ static int alsa_set_hw_params(tsig_alsa_t *alsa, tsig_cfg_t *cfg) {
   val = alsa_period_time;
   err = snd_pcm_hw_params_set_period_time_near(pcm, params, &val, NULL);
   if (err < 0) {
-    fprintf(stderr, "failed to set period time near %u: %s\n", alsa_period_time,
-            snd_strerror(err));
+    tsig_log_err("failed to set period time near %u: %s", alsa_period_time,
+                 snd_strerror(err));
     return err;
   }
   err = snd_pcm_hw_params_get_period_size(params, &size, NULL);
   if (err < 0) {
-    fprintf(stderr, "failed to get period size: %s\n", snd_strerror(err));
+    tsig_log_err("failed to get period size: %s", snd_strerror(err));
     return err;
   }
   alsa->period_size = size;
 
   err = snd_pcm_hw_params(pcm, params);
   if (err < 0) {
-    fprintf(stderr, "failed to set hw params: %s\n", snd_strerror(err));
+    tsig_log_err("failed to set hw params: %s", snd_strerror(err));
     return err;
   }
 
@@ -156,6 +156,7 @@ static int alsa_set_hw_params(tsig_alsa_t *alsa, tsig_cfg_t *cfg) {
 
 /** Set software parameters. */
 static int alsa_set_sw_params(tsig_alsa_t *alsa) {
+  tsig_log_t *log = alsa->log;
   snd_pcm_sw_params_t *params;
   snd_pcm_t *pcm = alsa->pcm;
   snd_pcm_uframes_t val;
@@ -165,7 +166,7 @@ static int alsa_set_sw_params(tsig_alsa_t *alsa) {
 
   err = snd_pcm_sw_params_current(pcm, params);
   if (err < 0) {
-    fprintf(stderr, "failed to get sw params: %s\n", snd_strerror(err));
+    tsig_log_err("failed to get sw params: %s", snd_strerror(err));
     return err;
   }
 
@@ -173,8 +174,8 @@ static int alsa_set_sw_params(tsig_alsa_t *alsa) {
   val = (alsa->buffer_size / alsa->period_size) * alsa->period_size;
   err = snd_pcm_sw_params_set_start_threshold(pcm, params, val);
   if (err < 0) {
-    fprintf(stderr, "failed to set start threshold %lu: %s\n", val,
-            snd_strerror(err));
+    tsig_log_err("failed to set start threshold %lu: %s", val,
+                 snd_strerror(err));
     return err;
   }
   alsa->start_threshold = val;
@@ -182,7 +183,7 @@ static int alsa_set_sw_params(tsig_alsa_t *alsa) {
   /* Accept more samples when the buffer is >=1 period from being full. */
   err = snd_pcm_sw_params_set_avail_min(pcm, params, alsa->period_size);
   if (err < 0) {
-    fprintf(stderr, "failed to set avail min: %s\n", snd_strerror(err));
+    tsig_log_err("failed to set avail min: %s", snd_strerror(err));
     return err;
   }
   alsa->avail_min = alsa->period_size;
@@ -196,19 +197,19 @@ static int alsa_set_sw_params(tsig_alsa_t *alsa) {
 
   err = snd_pcm_sw_params_get_boundary(params, &val);
   if (err < 0) {
-    fprintf(stderr, "failed to get boundary: %s\n", snd_strerror(err));
+    tsig_log_err("failed to get boundary: %s", snd_strerror(err));
     return err;
   }
   err = snd_pcm_sw_params_set_stop_threshold(pcm, params, val);
   if (err < 0) {
-    fprintf(stderr, "failed to set stop threshold %lu: %s\n", val,
-            snd_strerror(err));
+    tsig_log_err("failed to set stop threshold %lu: %s", val,
+                 snd_strerror(err));
     return err;
   }
 
   err = snd_pcm_sw_params(pcm, params);
   if (err < 0) {
-    fprintf(stderr, "failed to set sw params: %s\n", snd_strerror(err));
+    tsig_log_err("failed to set sw params: %s", snd_strerror(err));
     return err;
   }
 
@@ -216,16 +217,20 @@ static int alsa_set_sw_params(tsig_alsa_t *alsa) {
 }
 
 /** Attempt to recover from buffer underruns/overruns. */
-static void alsa_xrun_recover(snd_pcm_t *pcm, int err) {
+static void alsa_xrun_recover(tsig_log_t *log, snd_pcm_t *pcm, int err) {
   /* Resume if device is suspended. */
-  if (err == -ESTRPIPE)
+  if (err == -ESTRPIPE) {
+    tsig_log("recovering from suspend");
     while ((err = snd_pcm_resume(pcm)) == -EAGAIN)
       sleep(1);
+  } else {
+    tsig_log("recovering from underrun\n");
+  }
 
   if (err < 0) {
     err = snd_pcm_prepare(pcm);
     if (err < 0)
-      fprintf(stderr, "failed to recover from xrun: %s\n", snd_strerror(err));
+      tsig_log_warn("failed to recover from xrun: %s", snd_strerror(err));
   }
 }
 
@@ -333,21 +338,46 @@ static void alsa_loop_fill_buf(uint8_t buf[], double cb_buf[],
   }
 }
 
+#ifdef TSIG_DEBUG
+/** Print initialized sound output context. */
+static void alsa_print(tsig_alsa_t *alsa) {
+  const char *access = snd_pcm_access_name(alsa->access);
+  const char *format = snd_pcm_format_name(alsa->format);
+  tsig_log_t *log = alsa->log;
+  tsig_log_dbg("tsig_alsa_t %p = {", alsa);
+  tsig_log_dbg("  .pcm             = %p,", alsa->pcm);
+  tsig_log_dbg("  .device          = \"%s\",", alsa->device);
+  tsig_log_dbg("  .access          = %s,", access);
+  tsig_log_dbg("  .format          = %s,", format);
+  tsig_log_dbg("  .rate            = %u,", alsa->rate);
+  tsig_log_dbg("  .channels        = %u,", alsa->channels);
+  tsig_log_dbg("  .buffer_size     = %lu,", alsa->buffer_size);
+  tsig_log_dbg("  .period_size     = %lu,", alsa->period_size);
+  tsig_log_dbg("  .start_threshold = %lu,", alsa->start_threshold);
+  tsig_log_dbg("  .avail_min       = %lu,", alsa->avail_min);
+  tsig_log_dbg("  .log             = %p,", alsa->log);
+  tsig_log_dbg("};");
+}
+#endif /* TSIG_DEBUG */
+
 /**
  * Initialize sound output context.
  *
  * @param alsa Uninitialized sound output context.
  * @param cfg Initialized program configuration.
+ * @param log Initialized logging context.
  * @return 0 upon success, negative error code upon error.
  */
-int tsig_alsa_init(tsig_alsa_t *alsa, tsig_cfg_t *cfg) {
+int tsig_alsa_init(tsig_alsa_t *alsa, tsig_cfg_t *cfg, tsig_log_t *log) {
   snd_pcm_t *pcm;
   int err;
 
+  alsa->log = log;
+
   err = snd_pcm_open(&pcm, cfg->device, SND_PCM_STREAM_PLAYBACK, 0);
   if (err < 0) {
-    fprintf(stderr, "failed to open output device %s: %s\n", cfg->device,
-            snd_strerror(err));
+    tsig_log_err("failed to open output device %s: %s", cfg->device,
+                 snd_strerror(err));
     return err;
   }
   alsa->pcm = pcm;
@@ -360,6 +390,14 @@ int tsig_alsa_init(tsig_alsa_t *alsa, tsig_cfg_t *cfg) {
   err = alsa_set_sw_params(alsa);
   if (err < 0)
     goto out_deinit;
+
+#ifndef TSIG_DEBUG
+  tsig_log_dbg("opened device \"%s\" %s %u Hz %uch, buffer %lu, period %lu",
+               alsa->device, snd_pcm_format_name(alsa->format), alsa->rate,
+               alsa->channels, alsa->buffer_size, alsa->period_size);
+#else
+  alsa_print(alsa);
+#endif /* TSIG_DEBUG */
 
   return 0;
 
@@ -384,6 +422,7 @@ int tsig_alsa_loop(tsig_alsa_t *alsa, tsig_alsa_cb_t cb, void *cb_data) {
   bool is_le = snd_pcm_format_little_endian(alsa->format);
   bool is_signed = snd_pcm_format_signed(alsa->format);
   bool is_float = snd_pcm_format_float(alsa->format);
+  tsig_log_t *log = alsa->log;
   snd_pcm_t *pcm = alsa->pcm;
   snd_pcm_uframes_t written;
   snd_pcm_uframes_t remain;
@@ -397,25 +436,25 @@ int tsig_alsa_loop(tsig_alsa_t *alsa, tsig_alsa_cb_t cb, void *cb_data) {
 
   nfds = snd_pcm_poll_descriptors_count(pcm);
   if (nfds <= 0) {
-    fprintf(stderr, "failed to get poll descriptors count\n");
+    tsig_log_err("failed to get poll descriptors count");
     return nfds;
   }
 
   pfds = malloc(sizeof(*pfds) * nfds);
   if (!pfds) {
-    fprintf(stderr, "failed to allocate poll descriptors requests\n");
+    tsig_log_err("failed to allocate poll descriptors requests");
     return -ENOMEM;
   }
 
   err = snd_pcm_poll_descriptors(pcm, pfds, nfds);
   if (err < 0) {
-    fprintf(stderr, "failed to get poll descriptors: %s\n", snd_strerror(err));
+    tsig_log_err("failed to get poll descriptors: %s", snd_strerror(err));
     goto out_free_pfds;
   }
 
   cb_buf = malloc(sizeof(*cb_buf) * alsa->period_size);
   if (!cb_buf) {
-    fprintf(stderr, "failed to allocate generated sample buffer\n");
+    tsig_log_err("failed to allocate generated sample buffer");
     err = -ENOMEM;
     goto out_free_pfds;
   }
@@ -423,7 +462,7 @@ int tsig_alsa_loop(tsig_alsa_t *alsa, tsig_alsa_cb_t cb, void *cb_data) {
   buf = malloc(sizeof(*buf) * alsa->period_size * alsa->channels *
                snd_pcm_format_physical_width(alsa->format));
   if (!buf) {
-    fprintf(stderr, "failed to allocate period buffer\n");
+    tsig_log_err("failed to allocate period buffer");
     err = -ENOMEM;
     goto out_free_cb_buf;
   }
@@ -437,10 +476,10 @@ int tsig_alsa_loop(tsig_alsa_t *alsa, tsig_alsa_cb_t cb, void *cb_data) {
     if (is_running) {
       err = alsa_loop_wait(pcm, pfds, nfds);
       if (err == -EIO) {
-        fprintf(stderr, "failed to wait for poll: %s\n", snd_strerror(err));
+        tsig_log_err("failed to wait for poll: %s", snd_strerror(err));
         goto out_free_buf;
       } else if (err < 0) {
-        alsa_xrun_recover(pcm, err);
+        alsa_xrun_recover(log, pcm, err);
         is_running = false;
       }
     }
@@ -459,10 +498,10 @@ int tsig_alsa_loop(tsig_alsa_t *alsa, tsig_alsa_cb_t cb, void *cb_data) {
     while (remain) {
       err = snd_pcm_writei(pcm, ptr, remain);
       if (err == -EBADFD) {
-        fprintf(stderr, "failed to write frames: %s\n", snd_strerror(err));
+        tsig_log_err("failed to write frames: %s", snd_strerror(err));
         goto out_free_buf;
       } else if (err < 0) {
-        alsa_xrun_recover(pcm, err);
+        alsa_xrun_recover(log, pcm, err);
         is_running = false;
         break; /* Skip one period. */
       }
@@ -478,10 +517,10 @@ int tsig_alsa_loop(tsig_alsa_t *alsa, tsig_alsa_cb_t cb, void *cb_data) {
 
       err = alsa_loop_wait(pcm, pfds, nfds);
       if (err == -EIO) {
-        fprintf(stderr, "failed to wait for poll: %s\n", snd_strerror(err));
+        tsig_log_err("failed to wait for poll: %s", snd_strerror(err));
         goto out_free_buf;
       } else if (err < 0) {
-        alsa_xrun_recover(pcm, err);
+        alsa_xrun_recover(log, pcm, err);
         is_running = false;
       }
     }
@@ -506,12 +545,13 @@ out_free_pfds:
  * @return 0 upon success, negative error code upon error.
  */
 int tsig_alsa_deinit(tsig_alsa_t *alsa) {
+  tsig_log_t *log = alsa->log;
   int err;
 
   err = snd_pcm_close(alsa->pcm);
   if (err < 0)
-    fprintf(stderr, "failed to close output device %s: %s\n", alsa->device,
-            snd_strerror(err));
+    tsig_log_err("failed to close output device %s: %s", alsa->device,
+                 snd_strerror(err));
 
   return err;
 }

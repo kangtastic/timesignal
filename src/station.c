@@ -10,10 +10,16 @@
 #include "station.h"
 #include "cfg.h"
 #include "datetime.h"
+#include "log.h"
 
+#include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <limits.h>
+#include <syslog.h>
+
+/** Buffer size. */
+#define TSIG_STATION_MESSAGE_SIZE 128
 
 /** Maximum allowed time drift in milliseconds. */
 static const uint64_t station_drift_threshold = 500;
@@ -628,6 +634,77 @@ static void station_xmit_wwvb(tsig_station_t *station, int64_t utc_timestamp) {
   }
 }
 
+/** Print transmit level flags. */
+void station_xmit_level_print(tsig_log_t *log, uint8_t xmit_level[]) {
+#ifndef TSIG_DEBUG
+  tsig_log_dbg("transmit level flags for this minute:");
+#endif /* TSIG_DEBUG */
+  uint8_t bit = 0x01;
+  uint8_t i = 0;
+  char msg[TSIG_STATION_MESSAGE_SIZE];
+  for (uint8_t line = 0; line < 10; line++) {
+    char *wr = msg;
+    for (uint8_t sec = 0; sec < 6; sec++) {
+      if (sec)
+        *wr++ = ' ';
+      for (uint8_t dsec = 0; dsec < 10; dsec++) {
+        uint8_t b0 = xmit_level[i] & bit;
+        bit = (bit << 1) | (bit >> 7);
+        i += bit == 0x01;
+        uint8_t b1 = xmit_level[i] & bit;
+        bit = (bit << 1) | (bit >> 7);
+        i += bit == 0x01;
+        *wr++ = (!b0 && !b1)  ? '.'
+                : (!b0 && b1) ? '/'
+                : (b0 && b1)  ? '|'
+                              : '\\';
+      }
+    }
+    *wr++ = '\0';
+    tsig_log_dbg("    %s", msg);
+  }
+}
+
+#ifdef TSIG_DEBUG
+/** Print initialized station context. */
+void station_print(tsig_station_t *station) {
+  const char *station_name = tsig_cfg_station_name(station->station);
+  tsig_log_t *log = station->log;
+  tsig_log_dbg("tsig_station_t %p = {", station);
+  tsig_log_dbg("  .station        = %s,", station_name);
+  tsig_log_dbg("  .offset         = %d,", station->offset);
+  tsig_log_dbg("  .dut1           = %hd,", station->dut1);
+  tsig_log_dbg("  .smooth         = %d,", station->smooth);
+  tsig_log_dbg("  .sample_rate    = %u,", station->sample_rate);
+  tsig_log_dbg("  .xmit_level     = {");
+  station_xmit_level_print(log, station->xmit_level);
+  tsig_log_dbg("  },");
+  tsig_log_dbg("  .timestamp      = %lu,", station->timestamp);
+  tsig_log_dbg("  .next_timestamp = %lu,", station->next_timestamp);
+  tsig_log_dbg("  .samples_tick   = %lu,", station->samples_tick);
+  tsig_log_dbg("  .samples        = %lu,", station->samples);
+  tsig_log_dbg("  .next_tick      = %lu,", station->next_tick);
+  tsig_log_dbg("  .tick           = %hu,", station->tick);
+  tsig_log_dbg("  .is_morse       = %d,", station->is_morse);
+  tsig_log_dbg("  .iir            = {");
+  tsig_log_dbg("    .freq    = %u,", station->iir.freq);
+  tsig_log_dbg("    .rate    = %u,", station->iir.rate);
+  tsig_log_dbg("    .phase   = %d,", station->iir.phase);
+  tsig_log_dbg("    .a       = %f,", station->iir.a);
+  tsig_log_dbg("    .period  = %u,", station->iir.period);
+  tsig_log_dbg("    .init_y0 = %f,", station->iir.init_y0);
+  tsig_log_dbg("    .init_y1 = %f,", station->iir.init_y1);
+  tsig_log_dbg("    .sample  = %u,", station->iir.sample);
+  tsig_log_dbg("    .y0      = %f,", station->iir.y0);
+  tsig_log_dbg("    .y1      = %f,", station->iir.y1);
+  tsig_log_dbg("  },");
+  tsig_log_dbg("  .freq           = %u,", station->freq);
+  tsig_log_dbg("  .gain           = %f,", station->gain);
+  tsig_log_dbg("  .log            = %p,", station->log);
+  tsig_log_dbg("};");
+}
+#endif /* TSIG_DEBUG */
+
 /**
  * Time station waveform generator callback function.
  *
@@ -642,6 +719,7 @@ static void station_xmit_wwvb(tsig_station_t *station, int64_t utc_timestamp) {
 void tsig_station_cb(void *cb_data, double *out_cb_buf,
                      snd_pcm_uframes_t size) {
   tsig_station_t *station = cb_data;
+  tsig_log_t *log = station->log;
 
   station_info_t *info = &station_info[station->station];
   bool is_jjy = station->station == TSIG_CFG_STATION_JJY ||
@@ -683,7 +761,31 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf,
      * such a crossing. The phase change shouldn't matter for other stations.
      */
 
+#ifndef TSIG_DEBUG
     tsig_iir_init(&station->iir, station->freq, station->sample_rate, -to_min);
+#else
+    tsig_iir_init(&station->iir, 1000, station->sample_rate, -to_min);
+#endif /* TSIG_DEBUG */
+
+    char msg[TSIG_STATION_MESSAGE_SIZE];
+
+    sprintf(msg, "%04hu-%02hhu-%02hhu %02hhu:%02hhu:%02hhu.%03hu",
+            datetime.year, datetime.mon, datetime.day, datetime.hour,
+            datetime.min, datetime.sec, datetime.msec);
+
+    if (expected) {
+      tsig_log_note("Resynced to %s UTC.", msg);
+      tsig_log_note("System clock was %lu ms %s than expected.", drift,
+                    now < expected ? "less" : "more");
+    } else {
+      tsig_log("Synced to %s UTC.", msg);
+    }
+
+#ifndef TSIG_DEBUG
+    station_xmit_level_print(log, station->xmit_level);
+#else
+    station_print(station);
+#endif /* TSIG_DEBUG */
   }
 
   /* Fill the output buffer. */
@@ -701,8 +803,18 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf,
       station->next_tick += station->samples_tick;
 
       if (station->tick == TSIG_STATION_TICKS_MIN - 1) {
+        tsig_log("Synced at %04hu-%02hhu-%02hhu %02hhu:%02hhu UTC.",
+                 tick_datetime.year, tick_datetime.mon, tick_datetime.day,
+                 tick_datetime.hour, tick_datetime.min);
+
         info->xmit_cb(station, tick_timestamp);
         station->tick = 0;
+
+#ifndef TSIG_DEBUG
+        station_xmit_level_print(log, station->xmit_level);
+#else
+        station_print(station);
+#endif /* TSIG_DEBUG */
       } else {
         station->tick++;
       }
@@ -754,6 +866,7 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf,
  * Initialize a time station waveform generator context.
  *
  * @param station Uninitialized station waveform generator context.
+ * @param log Initialized logging context.
  * @param station_id Time station.
  * @param offset User offset in milliseconds.
  * @param dut1 DUT1 value in milliseconds.
@@ -761,9 +874,10 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf,
  * @param ultrasound Whether to allow ultrasound output.
  * @param sample_rate Actual ALSA sample rate.
  */
-void tsig_station_init(tsig_station_t *station, tsig_cfg_station_t station_id,
-                       int32_t offset, int16_t dut1, bool smooth,
-                       bool ultrasound, uint32_t sample_rate) {
+void tsig_station_init(tsig_station_t *station, tsig_log_t *log,
+                       tsig_cfg_station_t station_id, int32_t offset,
+                       int16_t dut1, bool smooth, bool ultrasound,
+                       uint32_t sample_rate) {
   *station = (tsig_station_t){
       .station = station_id,
       .offset = offset,
@@ -772,6 +886,7 @@ void tsig_station_init(tsig_station_t *station, tsig_cfg_station_t station_id,
       .sample_rate = sample_rate,
       .xmit_level = {0},
       .samples_tick = sample_rate * TSIG_STATION_MSECS_TICK / 1000,
+      .log = log,
   };
 
   /*
@@ -799,9 +914,24 @@ void tsig_station_init(tsig_station_t *station, tsig_cfg_station_t station_id,
   while (freq / subharmonic > limit)
     subharmonic += 2;
 
-#ifndef TSIG_DEBUG
   station->freq = freq / subharmonic;
-#else
-  station->freq = 1000;
-#endif
+
+  char msg[TSIG_STATION_MESSAGE_SIZE];
+  bool is_negative = offset < 0;
+  tsig_datetime_t datetime =
+      tsig_datetime_parse_timestamp(is_negative ? -offset : offset);
+  int len;
+
+  len = sprintf(msg, "Starting %s adjusted by %s%02hhu:%02hhu:%02hhu.%03hu",
+                tsig_cfg_station_name(station_id), is_negative ? "-" : "",
+                datetime.hour, datetime.min, datetime.sec, datetime.msec);
+  if (station_id == TSIG_CFG_STATION_MSF || station_id == TSIG_CFG_STATION_WWVB)
+    len += sprintf(&msg[len], ", DUT1 %hd ms", dut1);
+
+  tsig_log("%s.", msg);
+
+  tsig_log_dbg("gain smoothing %s, ultrasound output %s", smooth ? "on" : "off",
+               ultrasound ? "allowed" : "not allowed");
+  tsig_log_dbg("generating %u Hz carrier (subharmonic %u of %u Hz)",
+               freq / subharmonic, subharmonic, freq);
 }
