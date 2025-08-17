@@ -39,6 +39,9 @@ static tsig_cfg_t cfg_default = {
     .channels = 1,
     .smooth = false,
     .ultrasound = false,
+    .log_file = NULL,
+    .syslog = false,
+    .verbosity = 0,
 };
 
 /** Help string. */
@@ -62,8 +65,13 @@ static const char cfg_help_fmt[] = {
     "  -S, --smooth             smooth rapid gain changes in output waveform\n"
     "  -u, --ultrasound         enable ultrasound output (MAY DAMAGE EQUIPMENT)\n"
     "\n"
+    "Logging options:\n"
+    "  -l, --log=LOG_FILE       log messages to a file\n"
+    "  -L, --syslog             log messages to syslog\n"
+    "\n"
     "Miscellaneous:\n"
     "  -h, --help               show this help and exit\n"
+    "  -v, --verbose            increase verbosity level\n"
     "\n"
     "Recognized option values (not all work on all systems):\n"
     "  time station   BPC, DCF77, JJY, JJY60, MSF, WWVB\n"
@@ -80,6 +88,9 @@ static const char cfg_help_fmt[] = {
     "  channels       1-1023\n"
     "  smooth gain    provide to turn on\n"
     "  ultrasound     provide to turn on (MAY DAMAGE EQUIPMENT)\n"
+    "  log file       filesystem path\n"
+    "  syslog         provide to turn on\n"
+    "  verbosity      provide to increase (maximum twice)\n"
     "\n"
     "Default option values:\n"
     "  time station   WWVB\n"
@@ -91,6 +102,9 @@ static const char cfg_help_fmt[] = {
     "  channels       1\n"
     "  smooth gain    off\n"
     "  ultrasound     off\n"
+    "  log file       none\n"
+    "  syslog         off\n"
+    "  verbosity      0\n"
     "\n"
     /* clang-format on */
 };
@@ -175,7 +189,10 @@ static struct option cfg_longopts[] = {
     {"channels", required_argument, NULL, 'c'},
     {"smooth", no_argument, NULL, 'S'},
     {"ultrasound", no_argument, NULL, 'u'},
+    {"log", required_argument, NULL, 'l'},
+    {"syslog", no_argument, NULL, 'L'},
     {"help", no_argument, NULL, 'h'},
+    {"verbose", no_argument, NULL, 'v'},
     {NULL, 0, NULL, 0},
 };
 
@@ -318,7 +335,7 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, int argc, char *argv[]) {
   *cfg = cfg_default;
 
   while (!has_error) {
-    opt = getopt_long(argc, argv, "s:o:d:D:f:r:c:Suh", cfg_longopts, NULL);
+    opt = getopt_long(argc, argv, "s:o:d:D:f:r:c:Sul:Lhv", cfg_longopts, NULL);
     if (opt < 0)
       break;
 
@@ -402,8 +419,21 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, int argc, char *argv[]) {
         cfg->ultrasound = true;
         has_error = false;
         break;
+      case 'l':
+        cfg->log_file = optarg;
+        has_error = false;
+        break;
+      case 'L':
+        cfg->syslog = true;
+        has_error = false;
+        break;
       case 'h':
         help = true;
+        has_error = false;
+        break;
+      case 'v':
+        if (cfg->verbosity < 2)
+          cfg->verbosity++;
         has_error = false;
         break;
       default:

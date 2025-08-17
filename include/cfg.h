@@ -55,6 +55,11 @@ typedef struct tsig_cfg {
   uint16_t channels;       /** Channel count. */
   bool smooth;             /** Whether to interpolate rapid gain changes. */
   bool ultrasound;         /** Whether to allow ultrasound output. */
+
+  char *log_file; /** Path to log file. */
+  bool syslog;    /** Whether to log to syslog. */
+
+  int verbosity; /** Verbosity level. */
 } tsig_cfg_t;
 
 tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *, int, char *[]);
