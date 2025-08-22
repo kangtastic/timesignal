@@ -716,7 +716,7 @@ void station_print(tsig_station_t *station) {
 /**
  * Time station waveform generator callback function.
  *
- * This callback is invoked by tsig_alsa_loop() to generate some samples
+ * This callback is invoked by an audio backend to generate some samples
  * whenever the output buffer has been sufficiently drained to accept more.
  *
  * @param cb_data Initialized station waveform generator context.
@@ -724,8 +724,7 @@ void station_print(tsig_station_t *station) {
  * @param[out] out_cb_buf Buffer to be filled with 1ch 64-bit float samples.
  * @param size Count of samples to be generated.
  */
-void tsig_station_cb(void *cb_data, double *out_cb_buf,
-                     snd_pcm_uframes_t size) {
+void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size) {
   tsig_station_t *station = cb_data;
   tsig_log_t *log = station->log;
 
@@ -800,7 +799,7 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf,
   uint8_t xmit_bit = xmit_bit = 1 << (station->tick % CHAR_BIT);
   uint8_t xmit_i = station->tick / CHAR_BIT;
 
-  for (snd_pcm_uframes_t i = 0; i < size; i++) {
+  for (uint32_t i = 0; i < size; i++) {
     /* Update state on each tick. */
     if (station->samples == station->next_tick) {
       uint64_t tick_timestamp =

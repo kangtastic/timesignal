@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /**
- * alsa.c: Sound output facilities.
+ * alsa.c: ALSA output facilities.
  *
  * This file is part of timesignal.
  *
@@ -8,7 +8,9 @@
  */
 
 #include "alsa.h"
+#include "audio.h"
 #include "cfg.h"
+#include "mapping.h"
 
 #include <alsa/asoundlib.h>
 
@@ -27,18 +29,40 @@ static const unsigned alsa_buffer_time = 200000;
 /** Default period time in us. */
 static const unsigned alsa_period_time = 100000;
 
-/** Fallback sample formats. */
-static const snd_pcm_format_t alsa_format[] = {
-    SND_PCM_FORMAT_S16_LE,     SND_PCM_FORMAT_S16_BE,
-    SND_PCM_FORMAT_S24_LE,     SND_PCM_FORMAT_S24_BE,
-    SND_PCM_FORMAT_S32_LE,     SND_PCM_FORMAT_S32_BE,
-    SND_PCM_FORMAT_U16_LE,     SND_PCM_FORMAT_U16_BE,
-    SND_PCM_FORMAT_U24_LE,     SND_PCM_FORMAT_U24_BE,
-    SND_PCM_FORMAT_U32_LE,     SND_PCM_FORMAT_U32_BE,
-    SND_PCM_FORMAT_FLOAT_LE,   SND_PCM_FORMAT_FLOAT_BE,
-    SND_PCM_FORMAT_FLOAT64_LE, SND_PCM_FORMAT_FLOAT64_BE,
-    SND_PCM_FORMAT_LAST,
+/** Sample format map. */
+static const tsig_mapping_nn_t alsa_format_map[] = {
+    {TSIG_AUDIO_FORMAT_S16, SND_PCM_FORMAT_S16},
+    {TSIG_AUDIO_FORMAT_S16_LE, SND_PCM_FORMAT_S16_LE},
+    {TSIG_AUDIO_FORMAT_S16_BE, SND_PCM_FORMAT_S16_BE},
+    {TSIG_AUDIO_FORMAT_S24, SND_PCM_FORMAT_S24},
+    {TSIG_AUDIO_FORMAT_S24_LE, SND_PCM_FORMAT_S24_LE},
+    {TSIG_AUDIO_FORMAT_S24_BE, SND_PCM_FORMAT_S24_BE},
+    {TSIG_AUDIO_FORMAT_S32, SND_PCM_FORMAT_S32},
+    {TSIG_AUDIO_FORMAT_S32_LE, SND_PCM_FORMAT_S32_LE},
+    {TSIG_AUDIO_FORMAT_S32_BE, SND_PCM_FORMAT_S32_BE},
+    {TSIG_AUDIO_FORMAT_U16, SND_PCM_FORMAT_U16},
+    {TSIG_AUDIO_FORMAT_U16_LE, SND_PCM_FORMAT_U16_LE},
+    {TSIG_AUDIO_FORMAT_U16_BE, SND_PCM_FORMAT_U16_BE},
+    {TSIG_AUDIO_FORMAT_U24, SND_PCM_FORMAT_U24},
+    {TSIG_AUDIO_FORMAT_U24_LE, SND_PCM_FORMAT_U24_LE},
+    {TSIG_AUDIO_FORMAT_U24_BE, SND_PCM_FORMAT_U24_BE},
+    {TSIG_AUDIO_FORMAT_U32, SND_PCM_FORMAT_U32},
+    {TSIG_AUDIO_FORMAT_U32_LE, SND_PCM_FORMAT_U32_LE},
+    {TSIG_AUDIO_FORMAT_U32_BE, SND_PCM_FORMAT_U32_BE},
+    {TSIG_AUDIO_FORMAT_FLOAT, SND_PCM_FORMAT_FLOAT},
+    {TSIG_AUDIO_FORMAT_FLOAT_LE, SND_PCM_FORMAT_FLOAT_LE},
+    {TSIG_AUDIO_FORMAT_FLOAT_BE, SND_PCM_FORMAT_FLOAT_BE},
+    {TSIG_AUDIO_FORMAT_FLOAT64, SND_PCM_FORMAT_FLOAT64},
+    {TSIG_AUDIO_FORMAT_FLOAT64_LE, SND_PCM_FORMAT_FLOAT64_LE},
+    {TSIG_AUDIO_FORMAT_FLOAT64_BE, SND_PCM_FORMAT_FLOAT64_BE},
+    {0, 0},
 };
+
+/** Sample format lookup. */
+static snd_pcm_format_t alsa_format(const tsig_audio_format_t format) {
+  snd_pcm_format_t value = tsig_mapping_nn_match_key(alsa_format_map, format);
+  return value < 0 ? SND_PCM_FORMAT_UNKNOWN : value;
+}
 
 /** Set hardware parameters. */
 static int alsa_set_hw_params(tsig_alsa_t *alsa, tsig_cfg_t *cfg) {
@@ -68,15 +92,15 @@ static int alsa_set_hw_params(tsig_alsa_t *alsa, tsig_cfg_t *cfg) {
   }
   alsa->access = SND_PCM_ACCESS_RW_INTERLEAVED;
 
-  format = cfg->format;
+  format = alsa_format(cfg->format);
   err = snd_pcm_hw_params_set_format(pcm, params, format);
   if (err < 0) {
-    for (int i = 0; alsa_format[i] != SND_PCM_FORMAT_LAST; i++) {
-      if (!snd_pcm_hw_params_set_format(pcm, params, alsa_format[i])) {
+    for (int i = 0; alsa_format_map[i].value; i++) {
+      snd_pcm_format_t cand = alsa_format_map[i].value;
+      if (!snd_pcm_hw_params_set_format(pcm, params, cand)) {
         tsig_log_note("failed to set format %s, fallback to %s",
-                      snd_pcm_format_name(format),
-                      snd_pcm_format_name(alsa_format[i]));
-        format = alsa_format[i];
+                      snd_pcm_format_name(format), snd_pcm_format_name(cand));
+        format = cand;
         err = 0;
         break;
       }
@@ -92,7 +116,7 @@ static int alsa_set_hw_params(tsig_alsa_t *alsa, tsig_cfg_t *cfg) {
   val = cfg->rate;
   err = snd_pcm_hw_params_set_rate_near(pcm, params, &val, NULL);
   if (val != cfg->rate) {
-    if (TSIG_CFG_RATE_44100 <= val && val <= TSIG_CFG_RATE_384000)
+    if (TSIG_AUDIO_RATE_44100 <= val && val <= TSIG_AUDIO_RATE_384000)
       tsig_log_note("failed to set rate near %u, fallback to %u", cfg->rate,
                     val);
     else
@@ -255,94 +279,12 @@ static int alsa_loop_wait(snd_pcm_t *pcm, struct pollfd *pfds, unsigned nfds) {
   }
 }
 
-/** Fill period buffer. */
-static void alsa_loop_fill_buf(uint8_t buf[], double cb_buf[],
-                               unsigned channels, bool is_float, bool is_signed,
-                               bool is_le, bool is_cpu_le, int width,
-                               int phys_width, snd_pcm_uframes_t size) {
-  /*
-   * e.g. read 32-bit value in a 64-bit container,
-   *      write to a 32-bit container
-   *
-   * read indices:     0  1  2  3  4  5  6  7
-   * little-endian:   b0 b1 b2 b3 00 00 00 00
-   * big-endian:      00 00 00 00 b3 b2 b1 b0
-   *
-   * write indices:    0  1  2  3
-   * little-endian:   b0 b1 b2 b3
-   * big-endian:      b3 b2 b1 b0
-   *
-   * read/write indices for endian combinations, LSB to MSB:
-   *   little/big:    0  upto  3, 3 downto 0
-   *   little/little: 0  upto  3, 0  upto  3
-   *   big/little:    7 downto 4, 0  upto  3
-   *   big/big:       7 downto 4, 3 downto 0
-   */
-
-  int r_init = is_cpu_le ? 0 : sizeof(uint64_t) - 1;
-  int r_step = is_cpu_le ? 1 : -1;
-  int w_init = is_le ? 0 : phys_width - 1;
-  int w_step = is_le ? 1 : -1;
-  union {
-    uint64_t u64;
-    uint32_t u32;
-    int32_t i64;
-    double f64;
-    float f32;
-  } n;
-  uint8_t *pn = (uint8_t *)&n;
-
-  for (uint64_t i = 0, j = 0; i < size; i++) {
-    /*
-     * The current sample value is a double in [-1.0, 1.0].
-     * Quantize to 16 bits to try to create some RF noise during playback,
-     * which should remain even if we convert back to a float/double later.
-     * TODO: Quantizing to fewer bits might be even better.
-     */
-
-    if (is_float) {
-      n.i64 = cb_buf[i] * -INT16_MIN; /* [-32768, 32768] */
-    } else {
-      n.i64 = (1.0 + cb_buf[i]) * UINT16_MAX * 0.5; /* [0, 65535] */
-      if (is_signed)
-        n.i64 += INT16_MIN; /* [-32768, 32767] */
-    }
-
-    /* Convert back to the proper output format inside a 64-bit register. */
-    if (is_float) {
-      if (width == sizeof(float)) {
-        n.f32 = (float)n.i64 / -INT16_MIN;
-        n.u64 = (uint64_t)n.u32;
-      } else {
-        n.f64 = (double)n.i64 / -INT16_MIN;
-      }
-    } else {
-      n.u64 <<= (width - sizeof(uint16_t)) * CHAR_BIT;
-    }
-
-    /* Write the current sample value for the first interleaved channel. */
-    int r = r_init;
-    int w = w_init;
-
-    for (int k = 0; k < phys_width; k++) {
-      buf[j + w] = pn[r];
-      r += r_step;
-      w += w_step;
-    }
-
-    /* Write the value for subsequent interleaved channels. */
-    for (unsigned c = 1; c < channels; c++)
-      memcpy(&buf[j + c * phys_width], &buf[j], phys_width);
-
-    j += channels * phys_width;
-  }
-}
-
 #ifdef TSIG_DEBUG
-/** Print initialized sound output context. */
+/** Print initialized ALSA output context. */
 static void alsa_print(tsig_alsa_t *alsa) {
   const char *access = snd_pcm_access_name(alsa->access);
   const char *format = snd_pcm_format_name(alsa->format);
+  const char *audio_format = tsig_audio_format_name(alsa->audio_format);
   tsig_log_t *log = alsa->log;
   tsig_log_dbg("tsig_alsa_t %p = {", alsa);
   tsig_log_dbg("  .pcm             = %p,", alsa->pcm);
@@ -355,15 +297,16 @@ static void alsa_print(tsig_alsa_t *alsa) {
   tsig_log_dbg("  .period_size     = %lu,", alsa->period_size);
   tsig_log_dbg("  .start_threshold = %lu,", alsa->start_threshold);
   tsig_log_dbg("  .avail_min       = %lu,", alsa->avail_min);
+  tsig_log_dbg("  .audio_format    = %s,", audio_format);
   tsig_log_dbg("  .log             = %p,", alsa->log);
   tsig_log_dbg("};");
 }
 #endif /* TSIG_DEBUG */
 
 /**
- * Initialize sound output context.
+ * Initialize ALSA output context.
  *
- * @param alsa Uninitialized sound output context.
+ * @param alsa Uninitialized ALSA output context.
  * @param cfg Initialized program configuration.
  * @param log Initialized logging context.
  * @return 0 upon success, negative error code upon error.
@@ -376,7 +319,7 @@ int tsig_alsa_init(tsig_alsa_t *alsa, tsig_cfg_t *cfg, tsig_log_t *log) {
 
   err = snd_pcm_open(&pcm, cfg->device, SND_PCM_STREAM_PLAYBACK, 0);
   if (err < 0) {
-    tsig_log_err("failed to open output device %s: %s", cfg->device,
+    tsig_log_err("failed to open ALSA device %s: %s", cfg->device,
                  snd_strerror(err));
     return err;
   }
@@ -387,14 +330,18 @@ int tsig_alsa_init(tsig_alsa_t *alsa, tsig_cfg_t *cfg, tsig_log_t *log) {
   if (err < 0)
     goto out_deinit;
 
+  alsa->audio_format =
+      tsig_mapping_nn_match_value(alsa_format_map, alsa->format);
+
   err = alsa_set_sw_params(alsa);
   if (err < 0)
     goto out_deinit;
 
 #ifndef TSIG_DEBUG
-  tsig_log_dbg("opened device \"%s\" %s %u Hz %uch, buffer %lu, period %lu",
-               alsa->device, snd_pcm_format_name(alsa->format), alsa->rate,
-               alsa->channels, alsa->buffer_size, alsa->period_size);
+  tsig_log_dbg(
+      "opened ALSA device \"%s\" %s %u Hz %uch, buffer %lu, period %lu",
+      alsa->device, snd_pcm_format_name(alsa->format), alsa->rate,
+      alsa->channels, alsa->buffer_size, alsa->period_size);
 #else
   alsa_print(alsa);
 #endif /* TSIG_DEBUG */
@@ -408,20 +355,15 @@ out_deinit:
 }
 
 /**
- * Sound output loop.
+ * ALSA output loop.
  *
- * @param alsa Initialized sound output context.
+ * @param alsa Initialized ALSA output context.
  * @param cb Sample generator callback function.
  * @param cb_data Callback function context object.
  * @return 0 if loop exited normally, negative error code upon error.
  */
-int tsig_alsa_loop(tsig_alsa_t *alsa, tsig_alsa_cb_t cb, void *cb_data) {
+int tsig_alsa_loop(tsig_alsa_t *alsa, tsig_audio_cb_t cb, void *cb_data) {
   int phys_width = snd_pcm_format_physical_width(alsa->format) / CHAR_BIT;
-  bool is_cpu_le = SND_PCM_FORMAT_S16 == SND_PCM_FORMAT_S16_LE;
-  int width = snd_pcm_format_width(alsa->format) / CHAR_BIT;
-  bool is_le = snd_pcm_format_little_endian(alsa->format);
-  bool is_signed = snd_pcm_format_signed(alsa->format);
-  bool is_float = snd_pcm_format_float(alsa->format);
   tsig_log_t *log = alsa->log;
   snd_pcm_t *pcm = alsa->pcm;
   snd_pcm_uframes_t written;
@@ -488,8 +430,8 @@ int tsig_alsa_loop(tsig_alsa_t *alsa, tsig_alsa_cb_t cb, void *cb_data) {
     cb(cb_data, cb_buf, alsa->period_size);
 
     /* Fill the period buffer with the generated samples. */
-    alsa_loop_fill_buf(buf, cb_buf, alsa->channels, is_float, is_signed, is_le,
-                       is_cpu_le, width, phys_width, alsa->period_size);
+    tsig_audio_fill_buffer(alsa->audio_format, alsa->channels,
+                           alsa->period_size, buf, cb_buf);
 
     /* Write the generated samples to the output device. */
     remain = alsa->period_size;
@@ -539,9 +481,9 @@ out_free_pfds:
 }
 
 /**
- * Deinitialize sound output context.
+ * Deinitialize ALSA output context.
  *
- * @param alsa Initialized sound output context.
+ * @param alsa Initialized ALSA output context.
  * @return 0 upon success, negative error code upon error.
  */
 int tsig_alsa_deinit(tsig_alsa_t *alsa) {
@@ -550,7 +492,7 @@ int tsig_alsa_deinit(tsig_alsa_t *alsa) {
 
   err = snd_pcm_close(alsa->pcm);
   if (err < 0)
-    tsig_log_err("failed to close output device %s: %s", alsa->device,
+    tsig_log_err("failed to close ALSA device %s: %s", alsa->device,
                  snd_strerror(err));
 
   return err;

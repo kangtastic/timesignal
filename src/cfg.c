@@ -8,11 +8,10 @@
  */
 
 #include "cfg.h"
+#include "audio.h"
 #include "defaults.h"
 #include "log.h"
 #include "station.h"
-
-#include <alsa/asoundlib.h>
 
 #include <stdio.h>
 #include <stdint.h>
@@ -24,20 +23,14 @@
 
 #include <getopt.h>
 
-/* Structure for matching a string to a value. */
-typedef struct cfg_match {
-  const char *str;
-  const long value;
-} cfg_match_t;
-
 /** Default program configuration. */
 static tsig_cfg_t cfg_default = {
     .offset = 0,
     .station = TSIG_STATION_ID_WWVB,
     .dut1 = 0,
     .device = "default",
-    .format = SND_PCM_FORMAT_S16,
-    .rate = TSIG_CFG_RATE_48000,
+    .format = TSIG_AUDIO_FORMAT_S16,
+    .rate = TSIG_AUDIO_RATE_48000,
     .channels = 1,
     .smooth = false,
     .ultrasound = false,
@@ -119,48 +112,6 @@ static const long cfg_offset_max = 86400000;
 static const long cfg_dut1_min = -1000;
 static const long cfg_dut1_max = 1000;
 
-/** Recognized sample formats. */
-static const cfg_match_t cfg_formats[] = {
-    {"S16", SND_PCM_FORMAT_S16},
-    {"S16_LE", SND_PCM_FORMAT_S16_LE},
-    {"S16_BE", SND_PCM_FORMAT_S16_BE},
-    {"S24", SND_PCM_FORMAT_S24},
-    {"S24_LE", SND_PCM_FORMAT_S24_LE},
-    {"S24_BE", SND_PCM_FORMAT_S24_BE},
-    {"S32", SND_PCM_FORMAT_S32},
-    {"S32_LE", SND_PCM_FORMAT_S32_LE},
-    {"S32_BE", SND_PCM_FORMAT_S32_BE},
-    {"U16", SND_PCM_FORMAT_U16},
-    {"U16_LE", SND_PCM_FORMAT_U16_LE},
-    {"U16_BE", SND_PCM_FORMAT_U16_BE},
-    {"U24", SND_PCM_FORMAT_U24},
-    {"U24_LE", SND_PCM_FORMAT_U24_LE},
-    {"U24_BE", SND_PCM_FORMAT_U24_BE},
-    {"U32", SND_PCM_FORMAT_U32},
-    {"U32_LE", SND_PCM_FORMAT_U32_LE},
-    {"U32_BE", SND_PCM_FORMAT_U32_BE},
-    {"FLOAT", SND_PCM_FORMAT_FLOAT},
-    {"FLOAT_LE", SND_PCM_FORMAT_FLOAT_LE},
-    {"FLOAT_BE", SND_PCM_FORMAT_FLOAT_BE},
-    {"FLOAT64", SND_PCM_FORMAT_FLOAT64},
-    {"FLOAT64_LE", SND_PCM_FORMAT_FLOAT64_LE},
-    {"FLOAT64_BE", SND_PCM_FORMAT_FLOAT64_BE},
-    {NULL, 0},
-};
-
-/** Recognized sample rates.  */
-static const cfg_match_t cfg_rates[] = {
-    {"44100", TSIG_CFG_RATE_44100},
-    {"48000", TSIG_CFG_RATE_48000},
-    {"88200", TSIG_CFG_RATE_88200},
-    {"96000", TSIG_CFG_RATE_96000},
-    {"176400", TSIG_CFG_RATE_176400},
-    {"192000", TSIG_CFG_RATE_192000},
-    {"352800", TSIG_CFG_RATE_352800},
-    {"384000", TSIG_CFG_RATE_384000},
-    {NULL, 0},
-};
-
 /** Channel count limits (exclusive). */
 static const long cfg_channels_min = 0;
 static const long cfg_channels_max = 1024;
@@ -189,36 +140,6 @@ static struct option cfg_longopts[] = {
     {"verbose", no_argument, NULL, 'v'},
     {NULL, 0, NULL, 0},
 };
-
-/** Match a string to a value. */
-static bool cfg_match(const cfg_match_t cands[], const char *str,
-                      long *out_value) {
-  for (int i = 0; cands[i].str; i++) {
-    /* strcasecmp() is non-standard, so do it ourselves. */
-    const char *s1 = cands[i].str;
-    const char *s2 = str;
-
-    for (; *s1 && *s2; s1++, s2++)
-      if ((*s1 <= 'Z' ? *s1 + 'a' - 'A' : *s1) !=
-          (*s2 <= 'Z' ? *s2 + 'a' - 'A' : *s2))
-        break;
-
-    if (*s1 == *s2) {
-      *out_value = cands[i].value;
-      return true;
-    }
-  }
-
-  return false;
-}
-
-/** Match a value to a string. */
-static const char *cfg_match_value(const cfg_match_t cands[], long value) {
-  for (int i = 0; cands[i].str; i++)
-    if (value == cands[i].value)
-      return cands[i].str;
-  return NULL;
-}
 
 /** Parse a string in [[[+-]HH:]mm:]ss[.SSS] format. */
 static bool cfg_parse_offset(const char *str, long *out_msecs) {
@@ -323,12 +244,13 @@ static bool cfg_strtol(const char *str, long *out_n) {
 /** Print initialized program configuration. */
 static void cfg_print(tsig_cfg_t *cfg, tsig_log_t *log) {
   const char *station = tsig_station_name(cfg->station);
+  const char *format = tsig_audio_format_name(cfg->format);
   tsig_log_dbg("tsig_cfg_t %p = {", cfg);
   tsig_log_dbg("  .offset     = %d,", cfg->offset);
   tsig_log_dbg("  .station    = %s,", station);
   tsig_log_dbg("  .dut1       = %hu,", cfg->dut1);
   tsig_log_dbg("  .device     = \"%s\",", cfg->device);
-  tsig_log_dbg("  .format     = %s,", snd_pcm_format_name(cfg->format));
+  tsig_log_dbg("  .format     = %s,", format);
   tsig_log_dbg("  .rate       = %u,", cfg->rate);
   tsig_log_dbg("  .channels   = %hu,", cfg->channels);
   tsig_log_dbg("  .smooth     = %d,", cfg->smooth);
@@ -410,15 +332,17 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
         has_error = false;
         break;
       case 'f':
-        if (!cfg_match(cfg_formats, optarg, &tmp)) {
+        tmp = tsig_audio_format(optarg);
+        if (tmp == TSIG_AUDIO_FORMAT_UNKNOWN) {
           tsig_log_err("invalid format \"%s\"", optarg);
         } else {
-          cfg->format = (snd_pcm_format_t)tmp;
+          cfg->format = (tsig_audio_format_t)tmp;
           has_error = false;
         }
         break;
       case 'r':
-        if (!cfg_match(cfg_rates, optarg, &tmp)) {
+        tmp = tsig_audio_rate(optarg);
+        if (tmp == TSIG_AUDIO_RATE_UNKNOWN) {
           tsig_log_err("invalid rate \"%s\"", optarg);
         } else {
           cfg->rate = (uint32_t)tmp;

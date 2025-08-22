@@ -59,7 +59,7 @@ typedef struct tsig_station {
   tsig_log_t *log; /** Logging context. */
 } tsig_station_t;
 
-void tsig_station_cb(void *, double *, snd_pcm_uframes_t);
+void tsig_station_cb(void *, double *, uint32_t);
 void tsig_station_init(tsig_station_t *, tsig_log_t *, tsig_station_id_t,
                        int32_t, int16_t, bool, bool, uint32_t);
 tsig_station_id_t tsig_station_id(const char *);

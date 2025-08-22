@@ -9,10 +9,9 @@
 
 #pragma once
 
+#include "audio.h"
 #include "log.h"
 #include "station.h"
-
-#include <alsa/asoundlib.h>
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -24,30 +23,18 @@ typedef enum tsig_cfg_init_result {
   TSIG_CFG_INIT_HELP,      /** User printed help, exit gracefully. */
 } tsig_cfg_init_result_t;
 
-/** Sample rates. */
-typedef enum tsig_cfg_rate {
-  TSIG_CFG_RATE_44100 = 44100,
-  TSIG_CFG_RATE_48000 = 48000,
-  TSIG_CFG_RATE_88200 = 88200,
-  TSIG_CFG_RATE_96000 = 96000,
-  TSIG_CFG_RATE_176400 = 176400,
-  TSIG_CFG_RATE_192000 = 192000,
-  TSIG_CFG_RATE_352800 = 352800,
-  TSIG_CFG_RATE_384000 = 384000,
-} tsig_cfg_rate_t;
-
 /** Program configuration. */
 typedef struct tsig_cfg {
   int32_t offset;            /** User offset in milliseconds. */
   tsig_station_id_t station; /** Time station. */
   int16_t dut1;              /** DUT1 value in milliseconds. */
 
-  char *device;            /** Output device. */
-  snd_pcm_format_t format; /** Sample format. */
-  uint32_t rate;           /** Sample rate. */
-  uint16_t channels;       /** Channel count. */
-  bool smooth;             /** Whether to interpolate rapid gain changes. */
-  bool ultrasound;         /** Whether to allow ultrasound output. */
+  char *device;               /** Output device. */
+  tsig_audio_format_t format; /** Sample format. */
+  uint32_t rate;              /** Sample rate. */
+  uint16_t channels;          /** Channel count. */
+  bool smooth;                /** Whether to interpolate rapid gain changes. */
+  bool ultrasound;            /** Whether to allow ultrasound output. */
 
   char *log_file; /** Path to log file. */
   bool syslog;    /** Whether to log to syslog. */
