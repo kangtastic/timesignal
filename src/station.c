@@ -8,9 +8,9 @@
  */
 
 #include "station.h"
-#include "cfg.h"
 #include "datetime.h"
 #include "log.h"
+#include "mapping.h"
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -80,48 +80,56 @@ typedef struct station_info {
 } station_info_t;
 
 static station_info_t station_info[] = {
-    [TSIG_CFG_STATION_BPC] =
+    [TSIG_STATION_ID_BPC] =
         {
             .xmit_cb = station_xmit_bpc,
             .utc_offset = 28800000, /* CST is UTC+0800 */
             .freq = 68500,
             .xmit_low = 3.162277660168379411765e-01, /* -10 dB */
         },
-    [TSIG_CFG_STATION_DCF77] =
+    [TSIG_STATION_ID_DCF77] =
         {
             .xmit_cb = station_xmit_dcf77,
             .utc_offset = 3600000, /* CET is UTC+0100 */
             .freq = 77500,
             .xmit_low = 1.496235656094433430496e-01, /* -16.5 dB */
         },
-    [TSIG_CFG_STATION_JJY] =
+    [TSIG_STATION_ID_JJY] =
         {
             .xmit_cb = station_xmit_jjy,
             .utc_offset = 32400000, /* JST is UTC+0900 */
             .freq = 40000,
             .xmit_low = 3.162277660168379411765e-01, /* -10 dB */
         },
-    [TSIG_CFG_STATION_JJY60] =
+    [TSIG_STATION_ID_JJY60] =
         {
             .xmit_cb = station_xmit_jjy,
             .utc_offset = 32400000, /* JST is UTC+0900 */
             .freq = 60000,
             .xmit_low = 3.162277660168379411765e-01, /* -10 dB */
         },
-    [TSIG_CFG_STATION_MSF] =
+    [TSIG_STATION_ID_MSF] =
         {
             .xmit_cb = station_xmit_msf,
             .utc_offset = 0, /* UTC */
             .freq = 60000,
             .xmit_low = 0.0, /* On-off keying */
         },
-    [TSIG_CFG_STATION_WWVB] =
+    [TSIG_STATION_ID_WWVB] =
         {
             .xmit_cb = station_xmit_wwvb,
             .utc_offset = 0, /* UTC */
             .freq = 60000,
             .xmit_low = 1.412537544622754492885e-01, /* -17 dB */
         },
+};
+
+/** Recognized time stations. */
+static const tsig_mapping_t station_ids[] = {
+    {"BPC", TSIG_STATION_ID_BPC},     {"DCF77", TSIG_STATION_ID_DCF77},
+    {"JJY", TSIG_STATION_ID_JJY},     {"JJY40", TSIG_STATION_ID_JJY},
+    {"JJY60", TSIG_STATION_ID_JJY60}, {"MSF", TSIG_STATION_ID_MSF},
+    {"WWVB", TSIG_STATION_ID_WWVB},   {NULL, 0},
 };
 
 /** Perform linear interpolation between two doubles. */
@@ -149,7 +157,7 @@ static uint8_t station_odd_parity(uint8_t data[], uint32_t lo, uint32_t hi) {
 /** Compute transmit level flags for BPC. */
 static void station_xmit_bpc(tsig_station_t *station, int64_t utc_timestamp) {
   tsig_datetime_t datetime = tsig_datetime_parse_timestamp(
-      utc_timestamp + station_info[TSIG_CFG_STATION_BPC].utc_offset);
+      utc_timestamp + station_info[TSIG_STATION_ID_BPC].utc_offset);
   uint8_t bits[20] = {[0] = station_sync_marker};
 
   uint8_t hour_12h = datetime.hour % 12;
@@ -207,7 +215,7 @@ static void station_xmit_dcf77(tsig_station_t *station, int64_t utc_timestamp) {
   tsig_datetime_t utc_datetime = tsig_datetime_parse_timestamp(utc_timestamp);
 
   tsig_datetime_t datetime = tsig_datetime_parse_timestamp(
-      utc_timestamp + station_info[TSIG_CFG_STATION_DCF77].utc_offset);
+      utc_timestamp + station_info[TSIG_STATION_ID_DCF77].utc_offset);
   uint8_t bits[60] = {[20] = 1, [59] = station_sync_marker};
 
   /* Transmitted time is the CET/CEST time at the next UTC minute. */
@@ -344,7 +352,7 @@ static void station_xmit_jjy_morse(uint8_t xmit_level[]) {
 /** Compute transmit level flags for JJY and JJY60. */
 static void station_xmit_jjy(tsig_station_t *station, int64_t utc_timestamp) {
   tsig_datetime_t datetime = tsig_datetime_parse_timestamp(
-      utc_timestamp + station_info[TSIG_CFG_STATION_JJY].utc_offset);
+      utc_timestamp + station_info[TSIG_STATION_ID_JJY].utc_offset);
   uint8_t bits[60] = {
       [0] = station_sync_marker,  [9] = station_sync_marker,
       [19] = station_sync_marker, [29] = station_sync_marker,
@@ -436,7 +444,7 @@ static void station_xmit_msf(tsig_station_t *station, int64_t utc_timestamp) {
   tsig_datetime_t utc_datetime = tsig_datetime_parse_timestamp(utc_timestamp);
 
   tsig_datetime_t datetime = tsig_datetime_parse_timestamp(
-      utc_timestamp + station_info[TSIG_CFG_STATION_MSF].utc_offset);
+      utc_timestamp + station_info[TSIG_STATION_ID_MSF].utc_offset);
   uint8_t bits[60] = {[0] = station_sync_marker};
 
   int16_t dut1 = station->dut1 / 100;
@@ -547,7 +555,7 @@ static void station_xmit_wwvb(tsig_station_t *station, int64_t utc_timestamp) {
   tsig_datetime_t utc_datetime = tsig_datetime_parse_timestamp(utc_timestamp);
 
   tsig_datetime_t datetime = tsig_datetime_parse_timestamp(
-      utc_timestamp + station_info[TSIG_CFG_STATION_WWVB].utc_offset);
+      utc_timestamp + station_info[TSIG_STATION_ID_WWVB].utc_offset);
   uint8_t bits[60] = {
       [0] = station_sync_marker,  [9] = station_sync_marker,
       [19] = station_sync_marker, [29] = station_sync_marker,
@@ -668,7 +676,7 @@ void station_xmit_level_print(tsig_log_t *log, uint8_t xmit_level[]) {
 #ifdef TSIG_DEBUG
 /** Print initialized station context. */
 void station_print(tsig_station_t *station) {
-  const char *station_name = tsig_cfg_station_name(station->station);
+  const char *station_name = tsig_station_name(station->station);
   tsig_log_t *log = station->log;
   tsig_log_dbg("tsig_station_t %p = {", station);
   tsig_log_dbg("  .station        = %s,", station_name);
@@ -722,8 +730,8 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf,
   tsig_log_t *log = station->log;
 
   station_info_t *info = &station_info[station->station];
-  bool is_jjy = station->station == TSIG_CFG_STATION_JJY ||
-                station->station == TSIG_CFG_STATION_JJY60;
+  bool is_jjy = station->station == TSIG_STATION_ID_JJY ||
+                station->station == TSIG_STATION_ID_JJY60;
 
   /* Resync on first run or unexpected clock drift (e.g. due to NTP). */
   uint64_t now = tsig_datetime_get_timestamp() + station->offset;
@@ -875,7 +883,7 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf,
  * @param sample_rate Actual ALSA sample rate.
  */
 void tsig_station_init(tsig_station_t *station, tsig_log_t *log,
-                       tsig_cfg_station_t station_id, int32_t offset,
+                       tsig_station_id_t station_id, int32_t offset,
                        int16_t dut1, bool smooth, bool ultrasound,
                        uint32_t sample_rate) {
   *station = (tsig_station_t){
@@ -923,9 +931,9 @@ void tsig_station_init(tsig_station_t *station, tsig_log_t *log,
   int len;
 
   len = sprintf(msg, "Starting %s adjusted by %s%02hhu:%02hhu:%02hhu.%03hu",
-                tsig_cfg_station_name(station_id), is_negative ? "-" : "",
+                tsig_station_name(station_id), is_negative ? "-" : "",
                 datetime.hour, datetime.min, datetime.sec, datetime.msec);
-  if (station_id == TSIG_CFG_STATION_MSF || station_id == TSIG_CFG_STATION_WWVB)
+  if (station_id == TSIG_STATION_ID_MSF || station_id == TSIG_STATION_ID_WWVB)
     len += sprintf(&msg[len], ", DUT1 %hd ms", dut1);
 
   tsig_log("%s.", msg);
@@ -934,4 +942,25 @@ void tsig_station_init(tsig_station_t *station, tsig_log_t *log,
                ultrasound ? "allowed" : "not allowed");
   tsig_log_dbg("generating %u Hz carrier (subharmonic %u of %u Hz)",
                freq / subharmonic, subharmonic, freq);
+}
+
+/**
+ * Match a time station name to its station ID.
+ *
+ * @param name Time station name.
+ * @return Time station ID, or TSIG_STATION_ID_UNKNOWN if invalid.
+ */
+tsig_station_id_t tsig_station_id(const char *name) {
+  tsig_station_id_t value = tsig_mapping_match_key(station_ids, name);
+  return value < 0 ? TSIG_STATION_ID_UNKNOWN : value;
+}
+
+/**
+ * Match a time station ID to its name.
+ *
+ * @param station_id Time station ID.
+ * @return Time station name, or NULL if invalid.
+ */
+const char *tsig_station_name(tsig_station_id_t station_id) {
+  return tsig_mapping_match_value(station_ids, station_id);
 }

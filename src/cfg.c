@@ -10,6 +10,7 @@
 #include "cfg.h"
 #include "defaults.h"
 #include "log.h"
+#include "station.h"
 
 #include <alsa/asoundlib.h>
 
@@ -32,7 +33,7 @@ typedef struct cfg_match {
 /** Default program configuration. */
 static tsig_cfg_t cfg_default = {
     .offset = 0,
-    .station = TSIG_CFG_STATION_WWVB,
+    .station = TSIG_STATION_ID_WWVB,
     .dut1 = 0,
     .device = "default",
     .format = SND_PCM_FORMAT_S16,
@@ -113,14 +114,6 @@ static const char cfg_help_fmt[] = {
 /** User offset limits (exclusive). */
 static const long cfg_offset_min = -86400000;
 static const long cfg_offset_max = 86400000;
-
-/** Recognized time stations. */
-static const cfg_match_t cfg_stations[] = {
-    {"BPC", TSIG_CFG_STATION_BPC},     {"DCF77", TSIG_CFG_STATION_DCF77},
-    {"JJY", TSIG_CFG_STATION_JJY},     {"JJY40", TSIG_CFG_STATION_JJY},
-    {"JJY60", TSIG_CFG_STATION_JJY60}, {"MSF", TSIG_CFG_STATION_MSF},
-    {"WWVB", TSIG_CFG_STATION_WWVB},   {NULL, 0},
-};
 
 /** DUT1 limits (exclusive). */
 static const long cfg_dut1_min = -1000;
@@ -329,7 +322,7 @@ static bool cfg_strtol(const char *str, long *out_n) {
 #ifdef TSIG_DEBUG
 /** Print initialized program configuration. */
 static void cfg_print(tsig_cfg_t *cfg, tsig_log_t *log) {
-  const char *station = cfg_match_value(cfg_stations, cfg->station);
+  const char *station = tsig_station_name(cfg->station);
   tsig_log_dbg("tsig_cfg_t %p = {", cfg);
   tsig_log_dbg("  .offset     = %d,", cfg->offset);
   tsig_log_dbg("  .station    = %s,", station);
@@ -393,10 +386,11 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
         }
         break;
       case 's':
-        if (!cfg_match(cfg_stations, optarg, &tmp)) {
+        tmp = tsig_station_id(optarg);
+        if (tmp == TSIG_STATION_ID_UNKNOWN) {
           tsig_log_err("invalid station \"%s\"", optarg);
         } else {
-          cfg->station = (tsig_cfg_station_t)tmp;
+          cfg->station = (tsig_station_id_t)tmp;
           has_error = false;
         }
         break;
@@ -484,16 +478,6 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
   return has_error ? TSIG_CFG_INIT_FAIL
          : help    ? TSIG_CFG_INIT_HELP
                    : TSIG_CFG_INIT_OK;
-}
-
-/**
- * Match a time station ID to its name.
- *
- * @param station_id Time station ID.
- * @return String containing the time station's name.
- */
-const char *tsig_cfg_station_name(tsig_cfg_station_t station_id) {
-  return cfg_match_value(cfg_stations, station_id);
 }
 
 /** Print help message to stderr. */

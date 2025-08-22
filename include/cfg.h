@@ -10,6 +10,7 @@
 #pragma once
 
 #include "log.h"
+#include "station.h"
 
 #include <alsa/asoundlib.h>
 
@@ -35,21 +36,11 @@ typedef enum tsig_cfg_rate {
   TSIG_CFG_RATE_384000 = 384000,
 } tsig_cfg_rate_t;
 
-/** Time stations. */
-typedef enum tsig_cfg_station {
-  TSIG_CFG_STATION_BPC,
-  TSIG_CFG_STATION_DCF77,
-  TSIG_CFG_STATION_JJY,
-  TSIG_CFG_STATION_JJY60,
-  TSIG_CFG_STATION_MSF,
-  TSIG_CFG_STATION_WWVB,
-} tsig_cfg_station_t;
-
 /** Program configuration. */
 typedef struct tsig_cfg {
-  int32_t offset;             /** User offset in milliseconds. */
-  tsig_cfg_station_t station; /** Time station. */
-  int16_t dut1;               /** DUT1 value in milliseconds. */
+  int32_t offset;            /** User offset in milliseconds. */
+  tsig_station_id_t station; /** Time station. */
+  int16_t dut1;              /** DUT1 value in milliseconds. */
 
   char *device;            /** Output device. */
   snd_pcm_format_t format; /** Sample format. */
@@ -65,5 +56,4 @@ typedef struct tsig_cfg {
 } tsig_cfg_t;
 
 tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *, tsig_log_t *, int, char *[]);
-const char *tsig_cfg_station_name(tsig_cfg_station_t);
 void tsig_cfg_help(void);
