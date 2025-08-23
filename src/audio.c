@@ -12,6 +12,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <limits.h>
 
 /** Sample format names. */
@@ -131,8 +132,34 @@ static size_t audio_format_width(tsig_audio_format_t format) {
              : 0; /* TSIG_AUDIO_FORMAT_UNKNOWN */
 }
 
-/** Find physical width of audio format. */
-static size_t audio_format_phys_width(tsig_audio_format_t format) {
+/**
+ * Match a sample format name to its value.
+ *
+ * @param name Sample format name.
+ * @return Sample format value, or TSIG_AUDIO_FORMAT_UNKNOWN if invalid.
+ */
+tsig_audio_format_t tsig_audio_format(const char *name) {
+  tsig_audio_format_t value = tsig_mapping_match_key(audio_formats, name);
+  return value < 0 ? TSIG_AUDIO_FORMAT_UNKNOWN : value;
+}
+
+/**
+ * Match a sample format value to its name.
+ *
+ * @param format Sample format value.
+ * @return Sample format name, or NULL if invalid.
+ */
+const char *tsig_audio_format_name(tsig_audio_format_t format) {
+  return tsig_mapping_match_value(audio_formats, format);
+}
+
+/**
+ * Find the physical width of a sample format.
+ *
+ * @param format Sample format value.
+ * @return Physical width of the format.
+ */
+size_t tsig_audio_format_phys_width(tsig_audio_format_t format) {
   return (format == TSIG_AUDIO_FORMAT_S16 ||
           format == TSIG_AUDIO_FORMAT_S16_LE ||
           format == TSIG_AUDIO_FORMAT_S16_BE ||
@@ -164,27 +191,6 @@ static size_t audio_format_phys_width(tsig_audio_format_t format) {
 }
 
 /**
- * Match a sample format name to its value.
- *
- * @param name Sample format name.
- * @return Sample format value, or TSIG_AUDIO_FORMAT_UNKNOWN if invalid.
- */
-tsig_audio_format_t tsig_audio_format(const char *name) {
-  tsig_audio_format_t value = tsig_mapping_match_key(audio_formats, name);
-  return value < 0 ? TSIG_AUDIO_FORMAT_UNKNOWN : value;
-}
-
-/**
- * Match a sample format value to its name.
- *
- * @param format Sample format value.
- * @return Sample format name, or NULL if invalid.
- */
-const char *tsig_audio_format_name(tsig_audio_format_t format) {
-  return tsig_mapping_match_value(audio_formats, format);
-}
-
-/**
  * Match a sample rate name to its value.
  *
  * @param name Sample rate name.
@@ -207,7 +213,7 @@ tsig_audio_rate_t tsig_audio_rate(const char *name) {
 void tsig_audio_fill_buffer(tsig_audio_format_t format, uint32_t channels,
                             uint64_t size, uint8_t buf[], double cb_buf[]) {
   bool is_swap = tsig_audio_is_cpu_le() != audio_format_is_le(format);
-  size_t phys_width = audio_format_phys_width(format);
+  size_t phys_width = tsig_audio_format_phys_width(format);
   bool is_signed = audio_format_is_signed(format);
   bool is_float = audio_format_is_float(format);
   size_t width = audio_format_width(format);

@@ -22,11 +22,13 @@ INCDIR            := include
 
 CC                := gcc
 
-CFLAGS            ?= -O2 -Wall -Wextra -pedantic -std=gnu11
+CFLAGS            ?= -O2 -Wall -Wextra -std=gnu11
 CFLAGS            += -I$(INCDIR)
+CFLAGS            += $(shell $(PKG_CONFIG) --cflags libpipewire-0.3)
 
 LDFLAGS           ?=
 LDFLAGS           += $(shell $(PKG_CONFIG) --libs alsa)
+LDFLAGS           += $(shell $(PKG_CONFIG) --libs libpipewire-0.3)
 
 SRC               := $(wildcard $(SRCDIR)/*.c)
 OBJ               := $(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(SRC))

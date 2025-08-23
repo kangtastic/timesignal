@@ -9,8 +9,9 @@
 
 #pragma once
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 /** Recognized sample formats. */
 typedef enum tsig_audio_format {
@@ -66,6 +67,7 @@ typedef void (*tsig_audio_cb_t)(void *cb_data, double out_cb_buf[],
 
 tsig_audio_format_t tsig_audio_format(const char *);
 const char *tsig_audio_format_name(tsig_audio_format_t);
+size_t tsig_audio_format_phys_width(tsig_audio_format_t);
 tsig_audio_rate_t tsig_audio_rate(const char *);
 void tsig_audio_fill_buffer(tsig_audio_format_t, uint32_t, uint64_t, uint8_t[],
                             double[]);
