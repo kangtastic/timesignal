@@ -77,9 +77,8 @@ int main(int argc, char *argv[]) {
   tsig_cfg_t *cfg = &timesignal_cfg;
   tsig_log_t *log = &timesignal_log;
   timesignal_backend_t *backend;
-  const char *name;
   bool is_done = false;
-  uint32_t rate;
+  const char *name;
   int err;
 
   tsig_log_init(log);
@@ -89,6 +88,8 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   else if (err == TSIG_CFG_INIT_HELP)
     exit(EXIT_SUCCESS);
+
+  tsig_station_init(station, cfg, log);
 
 #ifdef TSIG_HAVE_BACKENDS
   if (cfg->backend != TSIG_BACKEND_UNKNOWN) {
@@ -108,14 +109,10 @@ int main(int argc, char *argv[]) {
       continue;
 
 #ifdef TSIG_HAVE_ALSA
-    rate = backend->backend == TSIG_BACKEND_ALSA ? timesignal_alsa.rate
-                                                 : cfg->rate;
-#else
-    rate = cfg->rate;
+    /* ALSA may not have given us the rate we requested. */
+    if (backend->backend == TSIG_BACKEND_ALSA)
+      tsig_station_set_rate(station, timesignal_alsa.rate);
 #endif /* TSIG_HAVE_ALSA */
-
-    tsig_station_init(station, log, cfg->station, cfg->offset, cfg->dut1,
-                      cfg->smooth, cfg->ultrasound, rate);
 
     err = backend->loop(backend->data, tsig_station_cb, (void *)station);
     if (err < 0)

@@ -17,6 +17,7 @@
 #include <stdbool.h>
 #include <limits.h>
 
+typedef struct tsig_cfg tsig_cfg_t;
 typedef struct tsig_log tsig_log_t;
 
 /** Our internal time quantum is a "tick". */
@@ -41,7 +42,7 @@ typedef struct tsig_station {
   int32_t offset;            /** User offset in milliseconds. */
   int16_t dut1;              /** DUT1 value in milliseconds. */
   bool smooth;               /** Whether to interpolate rapid gain changes. */
-  uint32_t sample_rate;      /** Sample rate. */
+  uint32_t rate;             /** Sample rate. */
 
   /** Bitfield of per-tick transmit level flags for current station minute. */
   uint8_t xmit_level[TSIG_STATION_TICKS_MIN / CHAR_BIT];
@@ -62,9 +63,8 @@ typedef struct tsig_station {
 } tsig_station_t;
 
 void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size);
-void tsig_station_init(tsig_station_t *station, tsig_log_t *log,
-                       tsig_station_id_t station_id, int32_t offset,
-                       int16_t dut1, bool smooth, bool ultrasound,
-                       uint32_t sample_rate);
+void tsig_station_init(tsig_station_t *station, tsig_cfg_t *cfg,
+                       tsig_log_t *log);
+void tsig_station_set_rate(tsig_station_t *station, uint32_t rate);
 tsig_station_id_t tsig_station_id(const char *name);
 const char *tsig_station_name(tsig_station_id_t station_id);

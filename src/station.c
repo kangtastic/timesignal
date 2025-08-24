@@ -9,6 +9,7 @@
 
 #include "station.h"
 
+#include "cfg.h"
 #include "datetime.h"
 #include "log.h"
 #include "mapping.h"
@@ -684,7 +685,7 @@ void station_print(tsig_station_t *station) {
   tsig_log_dbg("  .offset         = %d,", station->offset);
   tsig_log_dbg("  .dut1           = %hd,", station->dut1);
   tsig_log_dbg("  .smooth         = %d,", station->smooth);
-  tsig_log_dbg("  .sample_rate    = %u,", station->sample_rate);
+  tsig_log_dbg("  .rate           = %u,", station->rate);
   tsig_log_dbg("  .xmit_level     = {");
   station_xmit_level_print(log, station->xmit_level);
   tsig_log_dbg("  },");
@@ -733,7 +734,10 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size) {
   bool is_jjy = station->station == TSIG_STATION_ID_JJY ||
                 station->station == TSIG_STATION_ID_JJY60;
 
-  /* Resync on first run or unexpected clock drift (e.g. due to NTP). */
+  /*
+   * Resync on first run, sample rate change,
+   * or unexpected clock drift (e.g. due to NTP).
+   */
   uint64_t now = tsig_datetime_get_timestamp() + station->offset;
   uint64_t expected = station->next_timestamp;
   uint64_t drift = now > expected ? now - expected : expected - now;
@@ -745,13 +749,13 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size) {
     uint32_t msecs_to_tick = TSIG_STATION_MSECS_TICK - msecs_since_tick;
     uint32_t msecs_since_min = 1000 * datetime.sec + datetime.msec;
     uint32_t msecs_to_min = station_msecs_min - msecs_since_min;
-    int32_t to_min = msecs_to_min * station->sample_rate / 1000;
+    int32_t to_min = msecs_to_min * station->rate / 1000;
 
     info->xmit_cb(station, now);
 
     station->timestamp = now;
     station->samples = 0;
-    station->next_tick = msecs_to_tick * station->sample_rate / 1000;
+    station->next_tick = msecs_to_tick * station->rate / 1000;
     station->tick = msecs_since_min / TSIG_STATION_MSECS_TICK;
     station->is_morse = is_jjy &&
                         (datetime.min == station_jjy_morse_min ||
@@ -770,9 +774,9 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size) {
      */
 
 #ifndef TSIG_DEBUG
-    tsig_iir_init(&station->iir, station->freq, station->sample_rate, -to_min);
+    tsig_iir_init(&station->iir, station->freq, station->rate, -to_min);
 #else
-    tsig_iir_init(&station->iir, 1000, station->sample_rate, -to_min);
+    tsig_iir_init(&station->iir, 1000, station->rate, -to_min);
 #endif /* TSIG_DEBUG */
 
     char msg[TSIG_STATION_MESSAGE_SIZE];
@@ -804,7 +808,7 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size) {
     /* Update state on each tick. */
     if (station->samples == station->next_tick) {
       uint64_t tick_timestamp =
-          station->timestamp + station->samples * 1000 / station->sample_rate;
+          station->timestamp + station->samples * 1000 / station->rate;
       tsig_datetime_t tick_datetime =
           tsig_datetime_parse_timestamp(tick_timestamp);
 
@@ -866,7 +870,7 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size) {
   }
 
   /* Compute the next timestamp at which this callback will be invoked. */
-  uint64_t elapsed_msecs = station->samples * 1000 / station->sample_rate;
+  uint64_t elapsed_msecs = station->samples * 1000 / station->rate;
   station->next_timestamp = station->timestamp + elapsed_msecs;
 }
 
@@ -874,26 +878,26 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size) {
  * Initialize a time station waveform generator context.
  *
  * @param station Uninitialized station waveform generator context.
+ * @param cfg Initialized program configuration.
  * @param log Initialized logging context.
- * @param station_id Time station.
- * @param offset User offset in milliseconds.
- * @param dut1 DUT1 value in milliseconds.
- * @param smooth Whether to interpolate rapid gain changes.
- * @param ultrasound Whether to allow ultrasound output.
- * @param sample_rate Actual ALSA sample rate.
  */
-void tsig_station_init(tsig_station_t *station, tsig_log_t *log,
-                       tsig_station_id_t station_id, int32_t offset,
-                       int16_t dut1, bool smooth, bool ultrasound,
-                       uint32_t sample_rate) {
+void tsig_station_init(tsig_station_t *station, tsig_cfg_t *cfg,
+                       tsig_log_t *log) {
+  tsig_station_id_t station_id = cfg->station;
+  bool ultrasound = cfg->ultrasound;
+  int32_t offset = cfg->offset;
+  uint32_t rate = cfg->rate;
+  bool smooth = cfg->smooth;
+  int16_t dut1 = cfg->dut1;
+
   *station = (tsig_station_t){
       .station = station_id,
       .offset = offset,
       .dut1 = dut1,
       .smooth = smooth,
-      .sample_rate = sample_rate,
+      .rate = rate,
       .xmit_level = {0},
-      .samples_tick = sample_rate * TSIG_STATION_MSECS_TICK / 1000,
+      .samples_tick = rate * TSIG_STATION_MSECS_TICK / 1000,
       .log = log,
   };
 
@@ -915,7 +919,7 @@ void tsig_station_init(tsig_station_t *station, tsig_log_t *log,
    * it would be rather unlikely), so we will do so only if the user allows it.
    */
 
-  uint32_t limit = ultrasound ? sample_rate / 2 : station_ultrasound_threshold;
+  uint32_t limit = ultrasound ? rate / 2 : station_ultrasound_threshold;
   uint32_t freq = station_info[station_id].freq;
   uint32_t subharmonic = 1;
 
@@ -942,6 +946,18 @@ void tsig_station_init(tsig_station_t *station, tsig_log_t *log,
                ultrasound ? "allowed" : "not allowed");
   tsig_log_dbg("generating %u Hz carrier (subharmonic %u of %u Hz)",
                freq / subharmonic, subharmonic, freq);
+}
+
+/**
+ * Set the sample rate for a time station waveform generator context.
+ *
+ * @param station Initialized station waveform generator context.
+ * @param rate Sample rate.
+ */
+void tsig_station_set_rate(tsig_station_t *station, uint32_t rate) {
+  station->rate = rate;
+  station->samples_tick = rate * TSIG_STATION_MSECS_TICK / 1000;
+  station->next_timestamp = 0; /* Force a resync when possible. */
 }
 
 /**
