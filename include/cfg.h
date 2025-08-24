@@ -10,6 +10,9 @@
 #pragma once
 
 #include "audio.h"
+
+#include "backend.h"
+#include "log.h"
 #include "station.h"
 
 #include <stdbool.h>
@@ -30,12 +33,21 @@ typedef struct tsig_cfg {
   tsig_station_id_t station; /** Time station. */
   int16_t dut1;              /** DUT1 value in milliseconds. */
 
-  char *device;               /** Output device. */
+  /* clang-format off */
+#ifdef TSIG_HAVE_BACKENDS
+  tsig_backend_t backend;     /** Audio backend. */
+#endif /* TSIG_HAVE_BACKENDS */
+
+#ifdef TSIG_HAVE_ALSA
+  char *device;               /** ALSA device. */
+#endif /* TSIG_HAVE_ALSA */
+
   tsig_audio_format_t format; /** Sample format. */
   uint32_t rate;              /** Sample rate. */
   uint16_t channels;          /** Channel count. */
   bool smooth;                /** Whether to interpolate rapid gain changes. */
   bool ultrasound;            /** Whether to allow ultrasound output. */
+  /* clang-format on */
 
   char *log_file; /** Path to log file. */
   bool syslog;    /** Whether to log to syslog. */

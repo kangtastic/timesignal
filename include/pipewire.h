@@ -41,4 +41,4 @@ int tsig_pipewire_init(tsig_pipewire_t *pipewire, tsig_cfg_t *cfg,
                        tsig_log_t *log);
 int tsig_pipewire_loop(tsig_pipewire_t *pipewire, tsig_audio_cb_t cb,
                        void *cb_data);
-void tsig_pipewire_deinit(tsig_pipewire_t *pipewire);
+int tsig_pipewire_deinit(tsig_pipewire_t *pipewire);

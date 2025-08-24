@@ -301,8 +301,9 @@ int tsig_pipewire_loop(tsig_pipewire_t *pipewire, tsig_audio_cb_t cb,
  * Deinitialize PipeWire output context.
  *
  * @param pipewire Initialized PipeWire output context.
+ * @return 0 upon success, negative error code upon error.
  */
-void tsig_pipewire_deinit(tsig_pipewire_t *pipewire) {
+int tsig_pipewire_deinit(tsig_pipewire_t *pipewire) {
   if (pipewire->stream)
     pw_stream_destroy(pipewire->stream);
 

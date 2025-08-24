@@ -10,6 +10,7 @@
 #include "cfg.h"
 
 #include "audio.h"
+#include "backend.h"
 #include "defaults.h"
 #include "log.h"
 #include "station.h"
@@ -29,7 +30,15 @@ static tsig_cfg_t cfg_default = {
     .offset = 0,
     .station = TSIG_STATION_ID_WWVB,
     .dut1 = 0,
+
+#ifdef TSIG_HAVE_BACKENDS
+    .backend = TSIG_BACKEND_UNKNOWN,
+#endif /* TSIG_HAVE_BACKENDS */
+
+#ifdef TSIG_HAVE_ALSA
     .device = "default",
+#endif /* TSIG_HAVE_ALSA */
+
     .format = TSIG_AUDIO_FORMAT_S16,
     .rate = TSIG_AUDIO_RATE_48000,
     .channels = 1,
@@ -54,7 +63,15 @@ static const char cfg_help_fmt[] = {
     "  -d, --dut1=DUT1          DUT1 value in ms (only for MSF and WWVB)\n"
     "\n"
     "Sound options (rarely needed):\n"
-    "  -D, --device=DEVICE      output ALSA device\n"
+
+#ifdef TSIG_HAVE_BACKENDS
+    "  -m, --method=METHOD      output method\n"
+#endif /* TSIG_HAVE_BACKENDS */
+
+#ifdef TSIG_HAVE_ALSA
+    "  -D, --device=DEVICE      output device (only for ALSA)\n"
+#endif /* TSIG_HAVE_ALSA */
+
     "  -f, --format=FORMAT      output sample format\n"
     "  -r, --rate=RATE          output sample rate\n"
     "  -c, --channels=CHANNELS  output channels\n"
@@ -73,7 +90,15 @@ static const char cfg_help_fmt[] = {
     "  time station   BPC, DCF77, JJY, JJY60, MSF, WWVB\n"
     "  user offset    -23:59:59.999 to 23:59:59.999\n"
     "  DUT1 value     -999 to 999\n"
-    "  ALSA device    ALSA device name\n"
+
+#ifdef TSIG_HAVE_BACKENDS
+    "  output method  pipewire, alsa\n"
+#endif /* TSIG_HAVE_BACKENDS */
+
+#ifdef TSIG_HAVE_ALSA
+    "  output device  ALSA device name\n"
+#endif /* TSIG_HAVE_ALSA */
+
     "  sample format  S16, S16_LE, S16_BE, U16, U16_LE, U16_BE,\n"
     "                 S24, S24_LE, S24_BE, U24, U24_LE, U24_BE,\n"
     "                 S32, S32_LE, S32_BE, U32, U32_LE, U32_BE,\n"
@@ -92,7 +117,15 @@ static const char cfg_help_fmt[] = {
     "  time station   WWVB\n"
     "  user offset    00:00:00.000\n"
     "  DUT1 value     0\n"
+
+#ifdef TSIG_HAVE_BACKENDS
+    "  output method  autodetect\n"
+#endif /* TSIG_HAVE_BACKENDS */
+
+#ifdef TSIG_HAVE_ALSA
     "  ALSA device    default\n"
+#endif /* TSIG_HAVE_ALSA */
+
     "  sample format  S16\n"
     "  sample rate    48000\n"
     "  channels       1\n"
@@ -129,7 +162,15 @@ static struct option cfg_longopts[] = {
     {"station", required_argument, NULL, 's'},
     {"offset", required_argument, NULL, 'o'},
     {"dut1", required_argument, NULL, 'd'},
+
+#ifdef TSIG_HAVE_BACKENDS
+    {"method", required_argument, NULL, 'm'},
+#endif /* TSIG_HAVE_BACKENDS */
+
+#ifdef TSIG_HAVE_ALSA
     {"device", required_argument, NULL, 'D'},
+#endif /* TSIG_HAVE_ALSA */
+
     {"format", required_argument, NULL, 'f'},
     {"rate", required_argument, NULL, 'r'},
     {"channels", required_argument, NULL, 'c'},
@@ -140,6 +181,21 @@ static struct option cfg_longopts[] = {
     {"help", no_argument, NULL, 'h'},
     {"verbose", no_argument, NULL, 'v'},
     {NULL, 0, NULL, 0},
+};
+
+/** Short options. */
+static const char cfg_opts[] = {
+    "s:o:d:"
+
+#ifdef TSIG_HAVE_BACKENDS
+    "m:"
+#endif /* TSIG_HAVE_BACKENDS */
+
+#ifdef TSIG_HAVE_ALSA
+    "D:"
+#endif /* TSIG_HAVE_ALSA */
+
+    "f:r:c:Sul:Lhv",
 };
 
 /** Parse a string in [[[+-]HH:]mm:]ss[.SSS] format. */
@@ -246,11 +302,24 @@ static bool cfg_strtol(const char *str, long *out_n) {
 static void cfg_print(tsig_cfg_t *cfg, tsig_log_t *log) {
   const char *station = tsig_station_name(cfg->station);
   const char *format = tsig_audio_format_name(cfg->format);
+
+#ifdef TSIG_HAVE_BACKENDS
+  const char *backend = tsig_backend_name(cfg->backend);
+#endif /* TSIG_HAVE_BACKENDS */
+
   tsig_log_dbg("tsig_cfg_t %p = {", cfg);
   tsig_log_dbg("  .offset     = %d,", cfg->offset);
   tsig_log_dbg("  .station    = %s,", station);
   tsig_log_dbg("  .dut1       = %hu,", cfg->dut1);
+
+#ifdef TSIG_HAVE_BACKENDS
+  tsig_log_dbg("  .backend    = %s,", backend);
+#endif /* TSIG_HAVE_BACKENDS */
+
+#ifdef TSIG_HAVE_ALSA
   tsig_log_dbg("  .device     = \"%s\",", cfg->device);
+#endif /* TSIG_HAVE_ALSA */
+
   tsig_log_dbg("  .format     = %s,", format);
   tsig_log_dbg("  .rate       = %u,", cfg->rate);
   tsig_log_dbg("  .channels   = %hu,", cfg->channels);
@@ -283,7 +352,7 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
   *cfg = cfg_default;
 
   while (!has_error) {
-    opt = getopt_long(argc, argv, "s:o:d:D:f:r:c:Sul:Lhv", cfg_longopts, NULL);
+    opt = getopt_long(argc, argv, cfg_opts, cfg_longopts, NULL);
     if (opt < 0)
       break;
 
@@ -328,10 +397,26 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
           has_error = false;
         }
         break;
+
+#ifdef TSIG_HAVE_BACKENDS
+      case 'm':
+        tmp = tsig_backend(optarg);
+        if (tmp == TSIG_BACKEND_UNKNOWN) {
+          tsig_log_err("invalid backend \"%s\"", optarg);
+        } else {
+          cfg->backend = (tsig_backend_t)tmp;
+          has_error = false;
+        }
+        break;
+#endif /* TSIG_HAVE_BACKENDS */
+
+#ifdef TSIG_HAVE_ALSA
       case 'D':
         cfg->device = optarg;
         has_error = false;
         break;
+#endif /* TSIG_HAVE_ALSA */
+
       case 'f':
         tmp = tsig_audio_format(optarg);
         if (tmp == TSIG_AUDIO_FORMAT_UNKNOWN) {

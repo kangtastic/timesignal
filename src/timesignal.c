@@ -7,42 +7,133 @@
  * Copyright © 2025 James Seo <james@equiv.tech>
  */
 
-#include "alsa.h"
+#include "backend.h"
 #include "cfg.h"
 #include "log.h"
 #include "station.h"
 
+#ifdef TSIG_HAVE_PIPEWIRE
+#include "pipewire.h"
+#endif /* TSIG_HAVE_PIPEWIRE */
+
+#ifdef TSIG_HAVE_ALSA
+#include "alsa.h"
+#endif /* TSIG_HAVE_ALSA */
+
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 
+/* Module globals. */
+#ifdef TSIG_HAVE_PIPEWIRE
+static tsig_pipewire_t timesignal_pipewire;
+#endif /* TSIG_HAVE_PIPEWIRE */
+
+#ifdef TSIG_HAVE_ALSA
+static tsig_alsa_t timesignal_alsa;
+#endif /* TSIG_HAVE_ALSA */
+
+static tsig_station_t timesignal_station;
+static tsig_cfg_t timesignal_cfg;
+static tsig_log_t timesignal_log;
+
+/** Audio backend information. */
+typedef struct timesignal_backend_info {
+  tsig_backend_t backend;
+  void *data;
+  tsig_backend_init_t init;
+  tsig_backend_loop_t loop;
+  tsig_backend_deinit_t deinit;
+} timesignal_backend_t;
+
+/** Audio backends. */
+static timesignal_backend_t timesignal_backends[] = {
+#ifdef TSIG_HAVE_PIPEWIRE
+    [TSIG_BACKEND_PIPEWIRE] =
+        {
+            .backend = TSIG_BACKEND_PIPEWIRE,
+            .data = &timesignal_pipewire,
+            .init = (tsig_backend_init_t)&tsig_pipewire_init,
+            .loop = (tsig_backend_loop_t)&tsig_pipewire_loop,
+            .deinit = (tsig_backend_deinit_t)&tsig_pipewire_deinit,
+        },
+#endif /* TSIG_HAVE_PIPEWIRE */
+
+#ifdef TSIG_HAVE_ALSA
+    [TSIG_BACKEND_ALSA] =
+        {
+            .backend = TSIG_BACKEND_ALSA,
+            .data = &timesignal_alsa,
+            .init = (tsig_backend_init_t)&tsig_alsa_init,
+            .loop = (tsig_backend_loop_t)&tsig_alsa_loop,
+            .deinit = (tsig_backend_deinit_t)&tsig_alsa_deinit,
+        },
+#endif /* TSIG_HAVE_ALSA */
+};
+
 int main(int argc, char *argv[]) {
-  tsig_station_t station;
-  tsig_alsa_t alsa;
-  tsig_cfg_t cfg;
-  tsig_log_t log;
+  int backends = sizeof(timesignal_backends) / sizeof(timesignal_backends[0]);
+  tsig_station_t *station = &timesignal_station;
+  tsig_cfg_t *cfg = &timesignal_cfg;
+  tsig_log_t *log = &timesignal_log;
+  timesignal_backend_t *backend;
+  const char *name;
+  bool is_done = false;
+  uint32_t rate;
   int err;
 
-  tsig_log_init(&log);
+  tsig_log_init(log);
 
-  err = tsig_cfg_init(&cfg, &log, argc, argv);
+  err = tsig_cfg_init(cfg, log, argc, argv);
   if (err == TSIG_CFG_INIT_FAIL)
     exit(EXIT_FAILURE);
   else if (err == TSIG_CFG_INIT_HELP)
     exit(EXIT_SUCCESS);
 
-  err = tsig_alsa_init(&alsa, &cfg, &log);
-  if (err < 0)
+#ifdef TSIG_HAVE_BACKENDS
+  if (cfg->backend != TSIG_BACKEND_UNKNOWN) {
+    timesignal_backends[0] = timesignal_backends[cfg->backend];
+    backends = 1;
+  }
+#endif /* TSIG_HAVE_BACKENDS */
+
+  for (int i = 0; i < backends; i++) {
+    backend = &timesignal_backends[i];
+    name = tsig_backend_name(backend->backend);
+
+    tsig_log("Trying %s backend.", name);
+
+    err = backend->init(backend->data, cfg, log);
+    if (err < 0)
+      continue;
+
+#ifdef TSIG_HAVE_ALSA
+    rate = backend->backend == TSIG_BACKEND_ALSA ? timesignal_alsa.rate
+                                                 : cfg->rate;
+#else
+    rate = cfg->rate;
+#endif /* TSIG_HAVE_ALSA */
+
+    tsig_station_init(station, log, cfg->station, cfg->offset, cfg->dut1,
+                      cfg->smooth, cfg->ultrasound, rate);
+
+    err = backend->loop(backend->data, tsig_station_cb, (void *)station);
+    if (err < 0)
+      tsig_log_err("failed to cleanly exit output loop");
+
+    backend->deinit(backend->data);
+
+    is_done = true;
+
+    break;
+  }
+
+  if (!is_done) {
+    tsig_log_err("failed to find a suitable audio backend\n");
     exit(EXIT_FAILURE);
+  }
 
-  tsig_station_init(&station, &log, cfg.station, cfg.offset, cfg.dut1,
-                    cfg.smooth, cfg.ultrasound, alsa.rate);
-
-  err = tsig_alsa_loop(&alsa, tsig_station_cb, (void *)&station);
-  if (err < 0)
-    exit(EXIT_FAILURE);
-
-  tsig_alsa_deinit(&alsa);
-
-  tsig_log_deinit(&log);
+  tsig_log_deinit(log);
 
   exit(EXIT_SUCCESS);
 }
