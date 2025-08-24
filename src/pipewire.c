@@ -8,8 +8,11 @@
  */
 
 #include "pipewire.h"
+
 #include "audio.h"
+#include "cfg.h"
 #include "defaults.h"
+#include "log.h"
 #include "mapping.h"
 
 #include <stdint.h>

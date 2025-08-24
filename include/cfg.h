@@ -10,11 +10,12 @@
 #pragma once
 
 #include "audio.h"
-#include "log.h"
 #include "station.h"
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
+
+typedef struct tsig_log tsig_log_t;
 
 /** Program configuration initialization results. */
 typedef enum tsig_cfg_init_result {
@@ -42,5 +43,6 @@ typedef struct tsig_cfg {
   int verbosity; /** Verbosity level. */
 } tsig_cfg_t;
 
-tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *, tsig_log_t *, int, char *[]);
+tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
+                                     char *argv[]);
 void tsig_cfg_help(void);

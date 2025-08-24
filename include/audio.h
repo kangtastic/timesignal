@@ -65,10 +65,10 @@ typedef enum tsig_audio_rate {
 typedef void (*tsig_audio_cb_t)(void *cb_data, double out_cb_buf[],
                                 uint32_t size);
 
-tsig_audio_format_t tsig_audio_format(const char *);
-const char *tsig_audio_format_name(tsig_audio_format_t);
-size_t tsig_audio_format_phys_width(tsig_audio_format_t);
-tsig_audio_rate_t tsig_audio_rate(const char *);
-void tsig_audio_fill_buffer(tsig_audio_format_t, uint32_t, uint64_t, uint8_t[],
-                            double[]);
+tsig_audio_format_t tsig_audio_format(const char *name);
+const char *tsig_audio_format_name(tsig_audio_format_t format);
+size_t tsig_audio_format_phys_width(tsig_audio_format_t format);
+tsig_audio_rate_t tsig_audio_rate(const char *name);
+void tsig_audio_fill_buffer(tsig_audio_format_t format, uint32_t channels,
+                            uint64_t size, uint8_t buf[], double cb_buf[]);
 bool tsig_audio_is_cpu_le(void);

@@ -8,6 +8,7 @@
  */
 
 #include "audio.h"
+
 #include "mapping.h"
 
 #include <stdbool.h>

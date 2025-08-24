@@ -21,7 +21,8 @@ typedef struct tsig_mapping_nn {
   const long value;
 } tsig_mapping_nn_t;
 
-long tsig_mapping_match_key(const tsig_mapping_t[], const char *);
-const char *tsig_mapping_match_value(const tsig_mapping_t[], long);
-long tsig_mapping_nn_match_key(const tsig_mapping_nn_t[], long);
-long tsig_mapping_nn_match_value(const tsig_mapping_nn_t[], long);
+long tsig_mapping_match_key(const tsig_mapping_t mapping[], const char *key);
+const char *tsig_mapping_match_value(const tsig_mapping_t mapping[],
+                                     long value);
+long tsig_mapping_nn_match_key(const tsig_mapping_nn_t mapping[], long key);
+long tsig_mapping_nn_match_value(const tsig_mapping_nn_t mapping[], long value);

@@ -8,6 +8,7 @@
  */
 
 #include "station.h"
+
 #include "datetime.h"
 #include "log.h"
 #include "mapping.h"

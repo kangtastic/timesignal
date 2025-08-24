@@ -10,12 +10,14 @@
 #pragma once
 
 #include "iir.h"
-#include "log.h"
 
 #include <alsa/asoundlib.h>
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <limits.h>
+
+typedef struct tsig_log tsig_log_t;
 
 /** Our internal time quantum is a "tick". */
 #define TSIG_STATION_MSECS_TICK 50
@@ -59,8 +61,10 @@ typedef struct tsig_station {
   tsig_log_t *log; /** Logging context. */
 } tsig_station_t;
 
-void tsig_station_cb(void *, double *, uint32_t);
-void tsig_station_init(tsig_station_t *, tsig_log_t *, tsig_station_id_t,
-                       int32_t, int16_t, bool, bool, uint32_t);
-tsig_station_id_t tsig_station_id(const char *);
-const char *tsig_station_name(tsig_station_id_t);
+void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size);
+void tsig_station_init(tsig_station_t *station, tsig_log_t *log,
+                       tsig_station_id_t station_id, int32_t offset,
+                       int16_t dut1, bool smooth, bool ultrasound,
+                       uint32_t sample_rate);
+tsig_station_id_t tsig_station_id(const char *name);
+const char *tsig_station_name(tsig_station_id_t station_id);

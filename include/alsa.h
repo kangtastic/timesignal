@@ -10,10 +10,11 @@
 #pragma once
 
 #include "audio.h"
-#include "cfg.h"
-#include "log.h"
 
 #include <alsa/asoundlib.h>
+
+typedef struct tsig_cfg tsig_cfg_t;
+typedef struct tsig_log tsig_log_t;
 
 /** ALSA output context. */
 typedef struct tsig_alsa {
@@ -34,6 +35,6 @@ typedef struct tsig_alsa {
   tsig_log_t *log;                  /** Logging context. */
 } tsig_alsa_t;
 
-int tsig_alsa_init(tsig_alsa_t *, tsig_cfg_t *, tsig_log_t *);
-int tsig_alsa_loop(tsig_alsa_t *, tsig_audio_cb_t, void *);
-int tsig_alsa_deinit(tsig_alsa_t *);
+int tsig_alsa_init(tsig_alsa_t *alsa, tsig_cfg_t *cfg, tsig_log_t *log);
+int tsig_alsa_loop(tsig_alsa_t *alsa, tsig_audio_cb_t cb, void *cb_data);
+int tsig_alsa_deinit(tsig_alsa_t *alsa);

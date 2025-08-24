@@ -10,13 +10,14 @@
 #pragma once
 
 #include "audio.h"
-#include "cfg.h"
-#include "log.h"
 
 #include <stdint.h>
 
 #include <spa/param/audio/raw.h>
 #include <pipewire/pipewire.h>
+
+typedef struct tsig_cfg tsig_cfg_t;
+typedef struct tsig_log tsig_log_t;
 
 /** PipeWire output context. */
 typedef struct tsig_pipewire {
@@ -36,6 +37,8 @@ typedef struct tsig_pipewire {
   tsig_log_t *log;                  /** Logging context. */
 } tsig_pipewire_t;
 
-int tsig_pipewire_init(tsig_pipewire_t *, tsig_cfg_t *, tsig_log_t *);
-int tsig_pipewire_loop(tsig_pipewire_t *, tsig_audio_cb_t, void *);
-void tsig_pipewire_deinit(tsig_pipewire_t *);
+int tsig_pipewire_init(tsig_pipewire_t *pipewire, tsig_cfg_t *cfg,
+                       tsig_log_t *log);
+int tsig_pipewire_loop(tsig_pipewire_t *pipewire, tsig_audio_cb_t cb,
+                       void *cb_data);
+void tsig_pipewire_deinit(tsig_pipewire_t *pipewire);

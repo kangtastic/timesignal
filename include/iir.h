@@ -27,5 +27,5 @@ typedef struct tsig_iir {
   double y1;       /** Next sample value. */
 } tsig_iir_t;
 
-void tsig_iir_init(tsig_iir_t *, uint32_t, uint32_t, int);
-double tsig_iir_next(tsig_iir_t *);
+void tsig_iir_init(tsig_iir_t *iir, uint32_t freq, uint32_t rate, int phase);
+double tsig_iir_next(tsig_iir_t *iir);

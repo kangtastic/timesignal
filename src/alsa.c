@@ -8,8 +8,10 @@
  */
 
 #include "alsa.h"
+
 #include "audio.h"
 #include "cfg.h"
+#include "log.h"
 #include "mapping.h"
 
 #include <alsa/asoundlib.h>

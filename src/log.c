@@ -8,6 +8,7 @@
  */
 
 #include "log.h"
+
 #include "defaults.h"
 
 #include <stdio.h>

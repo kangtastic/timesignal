@@ -33,7 +33,7 @@ typedef struct tsig_datetime_t {
 } tsig_datetime_t;
 
 uint64_t tsig_datetime_get_timestamp(void);
-tsig_datetime_t tsig_datetime_parse_timestamp(int64_t);
-bool tsig_datetime_is_leap(uint16_t);
-bool tsig_datetime_is_eu_dst(tsig_datetime_t, int32_t *);
-bool tsig_datetime_is_us_dst(tsig_datetime_t, bool *);
+tsig_datetime_t tsig_datetime_parse_timestamp(int64_t timestamp);
+bool tsig_datetime_is_leap(uint16_t year);
+bool tsig_datetime_is_eu_dst(tsig_datetime_t datetime, int32_t *out_in_mins);
+bool tsig_datetime_is_us_dst(tsig_datetime_t datetime, bool *out_is_dst_end);

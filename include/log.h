@@ -44,7 +44,9 @@ typedef struct tsig_log {
   bool syslog;        /** Whether to emit logs to syslog. */
 } tsig_log_t;
 
-void tsig_log_init(tsig_log_t *);
-void tsig_log_finish_init(tsig_log_t *, const char *, bool, int);
-void tsig_log_msg(tsig_log_t *, int, const char *, int, const char *, ...);
-void tsig_log_deinit(tsig_log_t *);
+void tsig_log_init(tsig_log_t *log);
+void tsig_log_finish_init(tsig_log_t *log, const char *log_file, bool syslog,
+                          int verbosity);
+void tsig_log_msg(tsig_log_t *log, int level, const char *src_file,
+                  int src_line, const char *fmt, ...);
+void tsig_log_deinit(tsig_log_t *log);
