@@ -21,6 +21,12 @@ static const tsig_mapping_t backend_backends[] = {
     {"pw", TSIG_BACKEND_PIPEWIRE},
 #endif /* TSIG_HAVE_PIPEWIRE */
 
+#ifdef TSIG_HAVE_PULSE
+    {"PulseAudio", TSIG_BACKEND_PULSE},
+    {"Pulse", TSIG_BACKEND_PULSE},
+    {"pa", TSIG_BACKEND_PULSE},
+#endif /* TSIG_HAVE_PULSE */
+
 #ifdef TSIG_HAVE_ALSA
     {"ALSA", TSIG_BACKEND_ALSA},
 #endif /* TSIG_HAVE_ALSA */

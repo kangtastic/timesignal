@@ -22,6 +22,10 @@ typedef enum tsig_backend {
   TSIG_BACKEND_PIPEWIRE,
 #endif /* TSIG_HAVE_PIPEWIRE */
 
+#ifdef TSIG_HAVE_PULSE
+  TSIG_BACKEND_PULSE,
+#endif /* TSIG_HAVE_PULSE */
+
 #ifdef TSIG_HAVE_ALSA
   TSIG_BACKEND_ALSA,
 #endif /* TSIG_HAVE_ALSA */

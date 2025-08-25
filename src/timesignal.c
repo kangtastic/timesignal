@@ -16,6 +16,10 @@
 #include "pipewire.h"
 #endif /* TSIG_HAVE_PIPEWIRE */
 
+#ifdef TSIG_HAVE_PULSE
+#include "pulse.h"
+#endif /* TSIG_HAVE_PULSE */
+
 #ifdef TSIG_HAVE_ALSA
 #include "alsa.h"
 #endif /* TSIG_HAVE_ALSA */
@@ -28,6 +32,10 @@
 #ifdef TSIG_HAVE_PIPEWIRE
 static tsig_pipewire_t timesignal_pipewire;
 #endif /* TSIG_HAVE_PIPEWIRE */
+
+#ifdef TSIG_HAVE_PULSE
+static tsig_pulse_t timesignal_pulse;
+#endif /* TSIG_HAVE_PULSE */
 
 #ifdef TSIG_HAVE_ALSA
 static tsig_alsa_t timesignal_alsa;
@@ -58,6 +66,17 @@ static timesignal_backend_t timesignal_backends[] = {
             .deinit = (tsig_backend_deinit_t)&tsig_pipewire_deinit,
         },
 #endif /* TSIG_HAVE_PIPEWIRE */
+
+#ifdef TSIG_HAVE_PULSE
+    [TSIG_BACKEND_PULSE] =
+        {
+            .backend = TSIG_BACKEND_PULSE,
+            .data = &timesignal_pulse,
+            .init = (tsig_backend_init_t)&tsig_pulse_init,
+            .loop = (tsig_backend_loop_t)&tsig_pulse_loop,
+            .deinit = (tsig_backend_deinit_t)&tsig_pulse_deinit,
+        },
+#endif /* TSIG_HAVE_PULSE */
 
 #ifdef TSIG_HAVE_ALSA
     [TSIG_BACKEND_ALSA] =
@@ -107,6 +126,12 @@ int main(int argc, char *argv[]) {
     err = backend->init(backend->data, cfg, log);
     if (err < 0)
       continue;
+
+#ifdef TSIG_HAVE_PULSE
+    /* PulseAudio may not support the configured rate. */
+    if (backend->backend == TSIG_BACKEND_PULSE)
+      tsig_station_set_rate(station, timesignal_pulse.rate);
+#endif /* TSIG_HAVE_ALSA */
 
 #ifdef TSIG_HAVE_ALSA
     /* ALSA may not have given us the rate we requested. */

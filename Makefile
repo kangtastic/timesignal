@@ -13,10 +13,15 @@ $(error "Cannot find pkg-config.")
 endif
 
 HAVE_PIPEWIRE     := $(shell $(PKG_CONFIG) --exists libpipewire-0.3 && echo yes)
+HAVE_PULSE        := $(shell $(PKG_CONFIG) --exists libpulse && echo yes)
 HAVE_ALSA         := $(shell $(PKG_CONFIG) --exists alsa && echo yes)
 HAVE_BACKENDS     := 0
 
 ifeq (yes,$(HAVE_PIPEWIRE))
+HAVE_BACKENDS          := $(shell echo $$(($(HAVE_BACKENDS)+1)))
+endif
+
+ifeq (yes,$(HAVE_PULSE))
 HAVE_BACKENDS          := $(shell echo $$(($(HAVE_BACKENDS)+1)))
 endif
 
@@ -25,7 +30,7 @@ HAVE_BACKENDS          := $(shell echo $$(($(HAVE_BACKENDS)+1)))
 endif
 
 ifeq (0,$(HAVE_BACKENDS))
-$(error "Cannot find libpipewire-0.3 or alsa.")
+$(error "Cannot find libpipewire-0.3, libpulse, or alsa.")
 endif
 
 PREFIX            ?= /usr
@@ -54,6 +59,14 @@ LIBS              += $(shell $(PKG_CONFIG) --libs libpipewire-0.3)
 else
 SRC               := $(filter-out $(SRCDIR)/pipewire.c,$(SRC))
 OBJ               := $(filter-out $(BUILDDIR)/pipewire.o,$(OBJ))
+endif
+
+ifeq (yes,$(HAVE_PULSE))
+CFLAGS_EXTRA      += $(shell $(PKG_CONFIG) --cflags libpulse) -DTSIG_HAVE_PULSE
+LIBS              += $(shell $(PKG_CONFIG) --libs libpulse)
+else
+SRC               := $(filter-out $(SRCDIR)/pulse.c,$(SRC))
+OBJ               := $(filter-out $(BUILDDIR)/pulse.o,$(OBJ))
 endif
 
 ifeq (yes,$(HAVE_ALSA))

@@ -25,6 +25,20 @@
 
 #include <getopt.h>
 
+/** Configurable audio backends. */
+#ifdef TSIG_HAVE_BACKENDS
+#if defined(TSIG_HAVE_PIPEWIRE) && defined(TSIG_HAVE_PULSE) && \
+    defined(TSIG_HAVE_ALSA)
+#define TSIG_CFG_BACKENDS "pipewire, pulse, alsa"
+#elif defined(TSIG_HAVE_PIPEWIRE) && defined(TSIG_HAVE_PULSE)
+#define TSIG_CFG_BACKENDS "pipewire, pulse"
+#elif defined(TSIG_HAVE_PIPEWIRE) && defined(TSIG_HAVE_ALSA)
+#define TSIG_CFG_BACKENDS "pipewire, alsa"
+#else
+#define TSIG_CFG_BACKENDS "pulse, alsa"
+#endif /* TSIG_HAVE_PIPEWIRE, TSIG_HAVE_PULSE, TSIG_HAVE_ALSA */
+#endif /* TSIG_HAVE_BACKENDS */
+
 /** Default program configuration. */
 static tsig_cfg_t cfg_default = {
     .offset = 0,
@@ -92,7 +106,7 @@ static const char cfg_help_fmt[] = {
     "  DUT1 value     -999 to 999\n"
 
 #ifdef TSIG_HAVE_BACKENDS
-    "  output method  pipewire, alsa\n"
+    "  output method  " TSIG_CFG_BACKENDS "\n"
 #endif /* TSIG_HAVE_BACKENDS */
 
 #ifdef TSIG_HAVE_ALSA
