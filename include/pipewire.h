@@ -31,6 +31,7 @@ typedef struct tsig_pipewire {
   tsig_audio_cb_t cb; /** Sample generator callback. */
   void *cb_data;      /** Sample generator callback context object. */
   double *cb_buf;     /** Sample generator callback output buffer. */
+  uint32_t stride;    /** Stride (i.e. audio frame size). */
   uint32_t size;      /** PipeWire output buffer size. */
 
   tsig_audio_format_t audio_format; /** Sample format ID. */

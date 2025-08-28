@@ -81,8 +81,6 @@ static void pipewire_on_process(void *data) {
   tsig_log_t *log = pipewire->log;
   struct spa_buffer *spa_buf;
   struct pw_buffer *pw_buf;
-  size_t phys_width;
-  size_t stride;
   uint64_t size;
   uint8_t *buf;
 
@@ -100,9 +98,7 @@ static void pipewire_on_process(void *data) {
   }
 
   /* We don't know the number of samples PipeWire wants ahead of time. */
-  phys_width = tsig_audio_format_phys_width(pipewire->audio_format);
-  stride = phys_width * pipewire->channels;
-  size = spa_buf->datas[0].maxsize / stride;
+  size = spa_buf->datas[0].maxsize / pipewire->stride;
   if (size > pw_buf->requested)
     size = pw_buf->requested;
 
@@ -114,8 +110,8 @@ static void pipewire_on_process(void *data) {
                          pipewire->cb_buf);
 
   spa_buf->datas[0].chunk->offset = 0;
-  spa_buf->datas[0].chunk->stride = stride;
-  spa_buf->datas[0].chunk->size = size * stride;
+  spa_buf->datas[0].chunk->stride = pipewire->stride;
+  spa_buf->datas[0].chunk->size = size * pipewire->stride;
 
   pw_stream_queue_buffer(pipewire->stream, pw_buf);
 }
@@ -140,6 +136,7 @@ static void pipewire_print(tsig_pipewire_t *pipewire) {
   tsig_log_dbg("  .cb           = %p,", pipewire->cb);
   tsig_log_dbg("  .cb_data      = %p,", pipewire->cb_data);
   tsig_log_dbg("  .cb_buf       = %p,", pipewire->cb_buf);
+  tsig_log_dbg("  .stride       = %u,", pipewire->stride);
   tsig_log_dbg("  .size         = %u,", pipewire->size);
   tsig_log_dbg("  .audio_format = %s,", audio_format);
   tsig_log_dbg("  .log          = %p,", log);
@@ -246,6 +243,22 @@ int tsig_pipewire_init(tsig_pipewire_t *pipewire, tsig_cfg_t *cfg,
   pipewire->size = buffer_size;
   pipewire->audio_format =
       tsig_mapping_nn_match_value(pipewire_format_map, format);
+  pipewire->stride =
+      tsig_audio_format_phys_width(pipewire->audio_format) * channels;
+
+  /*
+   * We don't know how many 1ch 64-bit float samples to generate for a given
+   * process event until it actually occurs. Allocate a buffer capable of
+   * holding enough generated samples to fill the entire PipeWire output
+   * buffer, which should be at least twice as large as we'll ever need.
+   */
+
+  pipewire->cb_buf = malloc(buffer_size * sizeof(double));
+  if (!pipewire->cb_buf) {
+    tsig_log_err("failed to allocate generated sample buffer");
+    err = -ENOMEM;
+    goto out_deinit;
+  }
 
 #ifndef TSIG_DEBUG
   tsig_log_dbg("started PipeWire stream %s %u Hz %uch, buffer %lu",
@@ -272,27 +285,8 @@ out_deinit:
  */
 int tsig_pipewire_loop(tsig_pipewire_t *pipewire, tsig_audio_cb_t cb,
                        void *cb_data) {
-  tsig_log_t *log = pipewire->log;
-  double *cb_buf;
-
-  /*
-   * We don't know how many 1ch 64-bit float samples to generate for a given
-   * process event until it actually occurs. Allocate a buffer capable of
-   * holding enough generated samples to fill the entire PipeWire output
-   * buffer, which should be at least twice as large as we'll ever need.
-   */
-
-  cb_buf = malloc(pipewire->size * sizeof(double));
-  if (!cb_buf) {
-    tsig_log_err("failed to allocate generated sample buffer");
-    return -ENOMEM;
-  }
-
   pipewire->cb = cb;
   pipewire->cb_data = cb_data;
-  pipewire->cb_buf = cb_buf;
-
-  /* tsig_pipewire_deinit() frees the callback output buffer. */
 
   return pw_main_loop_run(pipewire->loop);
 }

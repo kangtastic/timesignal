@@ -63,32 +63,19 @@ static void pulse_context_state_cb(pa_context *ctx, void *data) {
 /** PulseAudio stream write callback. */
 static void pulse_stream_write_cb(pa_stream *stream, size_t length,
                                   void *data) {
+  /* Calculate the number of samples PulseAudio requested. */
   tsig_pulse_t *pulse = data;
-  size_t phys_width;
-  size_t stride;
-  uint8_t *buf;
-  size_t size;
-  int err;
-
-  /* Obtain an output buffer from PulseAudio. */
-  err = pa_stream_begin_write(stream, (void **)&buf, &length);
-  if (err < 0)
-    return;
-
-  /* Calculate the number of samples that can fit in that buffer. */
-  phys_width = tsig_audio_format_phys_width(pulse->audio_format);
-  stride = phys_width * pulse->channels;
-  size = length / stride;
+  size_t size = length / pulse->stride;
 
   /* Generate the requisite number of 1ch 64-bit float samples. */
   pulse->cb(pulse->cb_data, pulse->cb_buf, size);
 
   /* Fill the output buffer with the generated samples. */
-  tsig_audio_fill_buffer(pulse->audio_format, pulse->channels, size, buf,
+  tsig_audio_fill_buffer(pulse->audio_format, pulse->channels, size, pulse->buf,
                          pulse->cb_buf);
 
   /* Write the output buffer to the PulseAudio stream. */
-  pa_stream_write(stream, buf, length, NULL, 0, PA_SEEK_RELATIVE);
+  pa_stream_write(stream, pulse->buf, length, NULL, 0, PA_SEEK_RELATIVE);
 }
 
 #ifdef TSIG_DEBUG
@@ -106,6 +93,8 @@ static void pulse_print(tsig_pulse_t *pulse) {
   tsig_log_dbg("  .cb           = %p,", pulse->cb);
   tsig_log_dbg("  .cb_data      = %p,", pulse->cb_data);
   tsig_log_dbg("  .cb_buf       = %p,", pulse->cb_buf);
+  tsig_log_dbg("  .buf          = %p,", pulse->buf);
+  tsig_log_dbg("  .stride       = %u,", pulse->stride);
   tsig_log_dbg("  .size         = %u,", pulse->size);
   tsig_log_dbg("  .audio_format = %s,", audio_format);
   tsig_log_dbg("  .log          = %p,", log);
@@ -224,6 +213,34 @@ int tsig_pulse_init(tsig_pulse_t *pulse, tsig_cfg_t *cfg, tsig_log_t *log) {
   pulse->channels = channels;
   pulse->size = buffer_size;
   pulse->audio_format = tsig_mapping_nn_match_value(pulse_format_map, format);
+  pulse->stride = tsig_audio_format_phys_width(pulse->audio_format) * channels;
+
+  /*
+   * We don't know how many 1ch 64-bit float samples to generate for a given
+   * stream write callback until it actually occurs. Allocate a buffer capable
+   * of holding enough generated samples to fill the entire PulseAudio output
+   * buffer, which should be about twice as large as we'll ever need.
+   */
+
+  pulse->cb_buf = malloc(buffer_size * sizeof(double));
+  if (!pulse->cb_buf) {
+    tsig_log_err("failed to allocate generated sample buffer");
+    err = -ENOMEM;
+    goto out_deinit;
+  }
+
+  /*
+   * Allocate a client-side buffer to hold those samples once converted into the
+   * proper output format. Zero-copy writes via pa_stream_begin_write() would be
+   * ideal, but in testing underruns resulted from certain stream parameters.
+   */
+
+  pulse->buf = malloc(pulse->stride * buffer_size);
+  if (!pulse->buf) {
+    tsig_log_err("failed to allocate client-side output buffer");
+    err = -ENOMEM;
+    goto out_deinit;
+  }
 
 #ifndef TSIG_DEBUG
   tsig_log_dbg("started PulseAudio stream %s %u Hz %uch, buffer %lu",
@@ -249,27 +266,8 @@ out_deinit:
  * @return 0 if loop exited normally, negative error code upon error.
  */
 int tsig_pulse_loop(tsig_pulse_t *pulse, tsig_audio_cb_t cb, void *cb_data) {
-  tsig_log_t *log = pulse->log;
-  double *cb_buf;
-
-  /*
-   * We don't know how many 1ch 64-bit float samples to generate for a given
-   * stream write callback until it actually occurs. Allocate a buffer capable
-   * of holding enough generated samples to fill the entire PulseAudio output
-   * buffer, which should be about twice as large as we'll ever need.
-   */
-
-  cb_buf = malloc(pulse->size * sizeof(double));
-  if (!cb_buf) {
-    tsig_log_err("failed to allocate generated sample buffer");
-    return -ENOMEM;
-  }
-
   pulse->cb = cb;
   pulse->cb_data = cb_data;
-  pulse->cb_buf = cb_buf;
-
-  /* tsig_pulse_deinit() frees the callback output buffer. */
 
   return pa_mainloop_run(pulse->loop, NULL);
 }
@@ -290,6 +288,7 @@ int tsig_pulse_deinit(tsig_pulse_t *pulse) {
     pa_mainloop_free(pulse->loop);
 
   free(pulse->cb_buf);
+  free(pulse->buf);
 
   return 0;
 }
