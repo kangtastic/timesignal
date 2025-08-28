@@ -45,7 +45,7 @@ typedef struct tsig_log {
 } tsig_log_t;
 
 void tsig_log_init(tsig_log_t *log);
-void tsig_log_finish_init(tsig_log_t *log, const char *log_file, bool syslog,
+void tsig_log_finish_init(tsig_log_t *log, char log_file[], bool syslog,
                           int verbosity);
 void tsig_log_msg(tsig_log_t *log, int level, const char *src_file,
                   int src_line, const char *fmt, ...);

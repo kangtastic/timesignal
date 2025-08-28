@@ -9,6 +9,8 @@
 
 #include "mapping.h"
 
+#include "util.h"
+
 #include <stddef.h>
 
 /**
@@ -19,19 +21,9 @@
  * @return Matching value, or -1 if no matching value was found.
  */
 long tsig_mapping_match_key(const tsig_mapping_t mapping[], const char *key) {
-  for (int i = 0; mapping[i].key || mapping[i].value; i++) {
-    /* strcasecmp() is non-standard, so do it ourselves. */
-    const char *s1 = mapping[i].key;
-    const char *s2 = key;
-
-    for (; *s1 && *s2; s1++, s2++)
-      if ((*s1 <= 'Z' ? *s1 + 'a' - 'A' : *s1) !=
-          (*s2 <= 'Z' ? *s2 + 'a' - 'A' : *s2))
-        break;
-
-    if (*s1 == *s2)
+  for (int i = 0; mapping[i].key || mapping[i].value; i++)
+    if (!tsig_util_strcasecmp(key, mapping[i].key))
       return mapping[i].value;
-  }
 
   return -1;
 }

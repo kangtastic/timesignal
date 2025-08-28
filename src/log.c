@@ -129,7 +129,7 @@ void tsig_log_init(tsig_log_t *log) {
  * @param syslog Whether to emit logs to syslog.
  * @param verbosity Verbosity level.
  */
-void tsig_log_finish_init(tsig_log_t *log, const char *log_file, bool syslog,
+void tsig_log_finish_init(tsig_log_t *log, char log_file[], bool syslog,
                           int verbosity) {
   log->level = verbosity == 2   ? LOG_DEBUG
                : verbosity == 1 ? LOG_INFO
@@ -139,7 +139,7 @@ void tsig_log_finish_init(tsig_log_t *log, const char *log_file, bool syslog,
     log->syslog = true;
   }
 
-  if (log_file) {
+  if (*log_file) {
     log->log_file = fopen(log_file, "a");
 
     if (!log->log_file)

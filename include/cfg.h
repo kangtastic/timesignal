@@ -18,6 +18,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+/** Buffer sizes. */
+#define TSIG_CFG_PATH_SIZE 4096
+
+#ifdef TSIG_HAVE_ALSA
+#define TSIG_CFG_DEVICE_SIZE 128
+#endif /* TSIG_HAVE_ALSA */
+
 typedef struct tsig_log tsig_log_t;
 
 /** Program configuration initialization results. */
@@ -29,8 +36,8 @@ typedef enum tsig_cfg_init_result {
 
 /** Program configuration. */
 typedef struct tsig_cfg {
-  int32_t offset;            /** User offset in milliseconds. */
   tsig_station_id_t station; /** Time station. */
+  int32_t offset;            /** User offset in milliseconds. */
   int16_t dut1;              /** DUT1 value in milliseconds. */
 
   /* clang-format off */
@@ -39,7 +46,7 @@ typedef struct tsig_cfg {
 #endif /* TSIG_HAVE_BACKENDS */
 
 #ifdef TSIG_HAVE_ALSA
-  char *device;               /** ALSA device. */
+  char device[TSIG_CFG_DEVICE_SIZE]; /** ALSA device. */
 #endif /* TSIG_HAVE_ALSA */
 
   tsig_audio_format_t format; /** Sample format. */
@@ -49,8 +56,8 @@ typedef struct tsig_cfg {
   bool ultrasound;            /** Whether to allow ultrasound output. */
   /* clang-format on */
 
-  char *log_file; /** Path to log file. */
-  bool syslog;    /** Whether to log to syslog. */
+  char log_file[TSIG_CFG_PATH_SIZE]; /** Path to log file. */
+  bool syslog;                       /** Whether to log to syslog. */
 
   int verbosity; /** Verbosity level. */
 } tsig_cfg_t;
