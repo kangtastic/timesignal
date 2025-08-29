@@ -16,6 +16,7 @@
 #include "mapping.h"
 
 #include <stdint.h>
+#include <signal.h>
 
 #include <spa/param/audio/format-utils.h>
 #include <pipewire/pipewire.h>
@@ -73,6 +74,13 @@ static enum spa_audio_format pipewire_format(const tsig_audio_format_t format) {
 /** Sample format name lookup. */
 static const char *pipewire_format_name(const enum spa_audio_format format) {
   return tsig_mapping_match_value(pipewire_formats, format);
+}
+
+/** PipeWire signal handler. */
+static void pipewire_on_signal(void *data, int signal) {
+  tsig_pipewire_t *pipewire = data;
+  (void)signal; /* Suppress unused parameter warning. */
+  pw_main_loop_quit(pipewire->loop);
 }
 
 /** PipeWire process event callback. */
@@ -285,6 +293,11 @@ out_deinit:
  */
 int tsig_pipewire_loop(tsig_pipewire_t *pipewire, tsig_audio_cb_t cb,
                        void *cb_data) {
+  /* Install PipeWire signal handler. */
+  struct pw_loop *loop = pw_main_loop_get_loop(pipewire->loop);
+  pw_loop_add_signal(loop, SIGINT, pipewire_on_signal, pipewire);
+  pw_loop_add_signal(loop, SIGTERM, pipewire_on_signal, pipewire);
+
   pipewire->cb = cb;
   pipewire->cb_data = cb_data;
 

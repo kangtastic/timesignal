@@ -21,9 +21,13 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <limits.h>
+#include <signal.h>
 #include <string.h>
 
 #include <poll.h>
+
+/* Signal status flag. */
+static volatile sig_atomic_t alsa_got_signal = 0;
 
 /** Default buffer time in us. */
 static const unsigned alsa_buffer_time = 200000;
@@ -59,6 +63,12 @@ static const tsig_mapping_nn_t alsa_format_map[] = {
     {TSIG_AUDIO_FORMAT_FLOAT64_BE, SND_PCM_FORMAT_FLOAT64_BE},
     {0, 0},
 };
+
+/** Signal handler. */
+static void alsa_signal_handler(int signal) {
+  (void)signal; /* Suppress unused parameter warning. */
+  alsa_got_signal = 1;
+}
 
 /** Sample format lookup. */
 static snd_pcm_format_t alsa_format(const tsig_audio_format_t format) {
@@ -266,7 +276,13 @@ static int alsa_loop_wait(snd_pcm_t *pcm, struct pollfd *pfds, unsigned nfds) {
   snd_pcm_state_t state;
 
   for (;;) {
-    poll(pfds, nfds, -1);
+    if (poll(pfds, nfds, -1) < 0) {
+      if (errno == EINTR && alsa_got_signal) {
+        alsa_got_signal = 0;
+        return -EINTR;
+      }
+    }
+
     snd_pcm_poll_descriptors_revents(pcm, pfds, nfds, &revents);
 
     if (revents & POLLERR) {
@@ -366,14 +382,17 @@ out_deinit:
  */
 int tsig_alsa_loop(tsig_alsa_t *alsa, tsig_audio_cb_t cb, void *cb_data) {
   int phys_width = snd_pcm_format_physical_width(alsa->format) / CHAR_BIT;
+  struct sigaction sa = {.sa_handler = &alsa_signal_handler};
   tsig_log_t *log = alsa->log;
   snd_pcm_t *pcm = alsa->pcm;
+  struct pollfd *pfds = NULL;
   snd_pcm_uframes_t written;
   snd_pcm_uframes_t remain;
+  struct sigaction sa_term;
+  struct sigaction sa_int;
   bool is_running = false;
-  struct pollfd *pfds;
-  double *cb_buf;
-  uint8_t *buf;
+  double *cb_buf = NULL;
+  uint8_t *buf = NULL;
   uint8_t *ptr;
   int nfds;
   int err;
@@ -393,14 +412,14 @@ int tsig_alsa_loop(tsig_alsa_t *alsa, tsig_audio_cb_t cb, void *cb_data) {
   err = snd_pcm_poll_descriptors(pcm, pfds, nfds);
   if (err < 0) {
     tsig_log_err("failed to get poll descriptors: %s", snd_strerror(err));
-    goto out_free_pfds;
+    goto out_free_bufs;
   }
 
   cb_buf = malloc(sizeof(*cb_buf) * alsa->period_size);
   if (!cb_buf) {
     tsig_log_err("failed to allocate generated sample buffer");
     err = -ENOMEM;
-    goto out_free_pfds;
+    goto out_free_bufs;
   }
 
   buf = malloc(sizeof(*buf) * alsa->period_size * alsa->channels *
@@ -408,8 +427,13 @@ int tsig_alsa_loop(tsig_alsa_t *alsa, tsig_audio_cb_t cb, void *cb_data) {
   if (!buf) {
     tsig_log_err("failed to allocate period buffer");
     err = -ENOMEM;
-    goto out_free_cb_buf;
+    goto out_free_bufs;
   }
+
+  /* Install signal handler. */
+  sigemptyset(&sa.sa_mask);
+  sigaction(SIGINT, &sa, &sa_int);
+  sigaction(SIGTERM, &sa, &sa_term);
 
   /*
    * ALSA pulls one period's samples at a time with up to two waits.
@@ -419,9 +443,12 @@ int tsig_alsa_loop(tsig_alsa_t *alsa, tsig_audio_cb_t cb, void *cb_data) {
   for (;;) {
     if (is_running) {
       err = alsa_loop_wait(pcm, pfds, nfds);
-      if (err == -EIO) {
+      if (err == -EINTR) {
+        err = 0;
+        goto out_restore_signals;
+      } else if (err == -EIO) {
         tsig_log_err("failed to wait for poll: %s", snd_strerror(err));
-        goto out_free_buf;
+        goto out_restore_signals;
       } else if (err < 0) {
         alsa_xrun_recover(log, pcm, err);
         is_running = false;
@@ -443,7 +470,7 @@ int tsig_alsa_loop(tsig_alsa_t *alsa, tsig_audio_cb_t cb, void *cb_data) {
       err = snd_pcm_writei(pcm, ptr, remain);
       if (err == -EBADFD) {
         tsig_log_err("failed to write frames: %s", snd_strerror(err));
-        goto out_free_buf;
+        goto out_restore_signals;
       } else if (err < 0) {
         alsa_xrun_recover(log, pcm, err);
         is_running = false;
@@ -460,9 +487,12 @@ int tsig_alsa_loop(tsig_alsa_t *alsa, tsig_audio_cb_t cb, void *cb_data) {
         break;
 
       err = alsa_loop_wait(pcm, pfds, nfds);
-      if (err == -EIO) {
+      if (err == -EINTR) {
+        err = 0;
+        goto out_restore_signals;
+      } else if (err == -EIO) {
         tsig_log_err("failed to wait for poll: %s", snd_strerror(err));
-        goto out_free_buf;
+        goto out_restore_signals;
       } else if (err < 0) {
         alsa_xrun_recover(log, pcm, err);
         is_running = false;
@@ -470,13 +500,13 @@ int tsig_alsa_loop(tsig_alsa_t *alsa, tsig_audio_cb_t cb, void *cb_data) {
     }
   }
 
-out_free_buf:
+out_restore_signals:
+  sigaction(SIGTERM, &sa_term, NULL);
+  sigaction(SIGINT, &sa_int, NULL);
+
+out_free_bufs:
   free(buf);
-
-out_free_cb_buf:
   free(cb_buf);
-
-out_free_pfds:
   free(pfds);
 
   return err;

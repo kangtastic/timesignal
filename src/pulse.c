@@ -16,6 +16,7 @@
 #include "mapping.h"
 
 #include <stdint.h>
+#include <signal.h>
 
 #include <pulse/pulseaudio.h>
 
@@ -52,6 +53,16 @@ pa_sample_format_t pulse_format(const tsig_audio_format_t format) {
   pa_sample_format_t value =
       tsig_mapping_nn_match_key(pulse_format_map, format);
   return value < 0 ? PA_SAMPLE_INVALID : value;
+}
+
+/** PulseAudio signal handler. */
+static void pulse_signal_cb(pa_mainloop_api *api, pa_signal_event *event,
+                            int signal, void *data) {
+  tsig_pulse_t *pulse = data;
+  (void)api;    /* Suppress unused parameter warning. */
+  (void)event;  /* Suppress unused parameter warning. */
+  (void)signal; /* Suppress unused parameter warning. */
+  pa_mainloop_quit(pulse->loop, 0);
 }
 
 /** PulseAudio context state change callback. */
@@ -266,10 +277,29 @@ out_deinit:
  * @return 0 if loop exited normally, negative error code upon error.
  */
 int tsig_pulse_loop(tsig_pulse_t *pulse, tsig_audio_cb_t cb, void *cb_data) {
+  tsig_log_t *log = pulse->log;
+  int loop_ret = 0;
+  int err;
+
+  /* Install PulseAudio signal handler.*/
+  err = pa_signal_init(pa_mainloop_get_api(pulse->loop));
+  if (err < 0) {
+    tsig_log_err("failed to initialize PulseAudio signal subsystem");
+    return err;
+  }
+
+  pa_signal_new(SIGINT, pulse_signal_cb, pulse);
+  pa_signal_new(SIGTERM, pulse_signal_cb, pulse);
+
   pulse->cb = cb;
   pulse->cb_data = cb_data;
 
-  return pa_mainloop_run(pulse->loop, NULL);
+  err = pa_mainloop_run(pulse->loop, &loop_ret);
+
+  pa_signal_done();
+
+  /* cf. PulseAudio src/pulse/mainloop.c pa_mainloop_run() */
+  return err < 0 ? err : loop_ret;
 }
 
 /**
