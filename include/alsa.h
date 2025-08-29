@@ -32,6 +32,7 @@ typedef struct tsig_alsa {
   snd_pcm_uframes_t avail_min;       /** Fill threshold. */
 
   tsig_audio_format_t audio_format; /** Sample format ID. */
+  unsigned timeout;                 /** User timeout in seconds. */
   tsig_log_t *log;                  /** Logging context. */
 } tsig_alsa_t;
 

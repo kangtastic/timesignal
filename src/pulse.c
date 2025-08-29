@@ -18,6 +18,8 @@
 #include <stdint.h>
 #include <signal.h>
 
+#include <unistd.h>
+
 #include <pulse/pulseaudio.h>
 
 /** Default buffer time in us. */
@@ -108,6 +110,7 @@ static void pulse_print(tsig_pulse_t *pulse) {
   tsig_log_dbg("  .stride       = %u,", pulse->stride);
   tsig_log_dbg("  .size         = %u,", pulse->size);
   tsig_log_dbg("  .audio_format = %s,", audio_format);
+  tsig_log_dbg("  .timeout      = %u,", pulse->timeout);
   tsig_log_dbg("  .log          = %p,", log);
   tsig_log_dbg("};");
 }
@@ -132,6 +135,7 @@ int tsig_pulse_init(tsig_pulse_t *pulse, tsig_cfg_t *cfg, tsig_log_t *log) {
   int err = -1;
 
   *pulse = (tsig_pulse_t){
+      .timeout = cfg->timeout,
       .log = log,
   };
 
@@ -290,13 +294,15 @@ int tsig_pulse_loop(tsig_pulse_t *pulse, tsig_audio_cb_t cb, void *cb_data) {
 
   pa_signal_new(SIGINT, pulse_signal_cb, pulse);
   pa_signal_new(SIGTERM, pulse_signal_cb, pulse);
+  pa_signal_new(SIGALRM, pulse_signal_cb, pulse);
 
   pulse->cb = cb;
   pulse->cb_data = cb_data;
 
+  alarm(pulse->timeout);
   err = pa_mainloop_run(pulse->loop, &loop_ret);
-
   pa_signal_done();
+  alarm(0);
 
   /* cf. PulseAudio src/pulse/mainloop.c pa_mainloop_run() */
   return err < 0 ? err : loop_ret;

@@ -35,6 +35,7 @@ typedef struct tsig_pipewire {
   uint32_t size;      /** PipeWire output buffer size. */
 
   tsig_audio_format_t audio_format; /** Sample format ID. */
+  unsigned timeout;                 /** User timeout in seconds. */
   tsig_log_t *log;                  /** Logging context. */
 } tsig_pipewire_t;
 

@@ -36,6 +36,7 @@ typedef struct tsig_pulse {
   uint32_t size;      /** PulseAudio output buffer size. */
 
   tsig_audio_format_t audio_format; /** Sample format ID. */
+  unsigned timeout;                 /** User timeout in seconds. */
   tsig_log_t *log;                  /** Logging context. */
 } tsig_pulse_t;
 

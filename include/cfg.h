@@ -40,6 +40,8 @@ typedef struct tsig_cfg {
   int32_t offset;            /** User offset in milliseconds. */
   int16_t dut1;              /** DUT1 value in milliseconds. */
 
+  unsigned timeout; /** User timeout in seconds. */
+
   /* clang-format off */
 #ifdef TSIG_HAVE_BACKENDS
   tsig_backend_t backend;     /** Audio backend. */

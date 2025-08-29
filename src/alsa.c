@@ -25,6 +25,7 @@
 #include <string.h>
 
 #include <poll.h>
+#include <unistd.h>
 
 /* Signal status flag. */
 static volatile sig_atomic_t alsa_got_signal = 0;
@@ -316,6 +317,7 @@ static void alsa_print(tsig_alsa_t *alsa) {
   tsig_log_dbg("  .start_threshold = %lu,", alsa->start_threshold);
   tsig_log_dbg("  .avail_min       = %lu,", alsa->avail_min);
   tsig_log_dbg("  .audio_format    = %s,", audio_format);
+  tsig_log_dbg("  .timeout         = %u,", alsa->timeout);
   tsig_log_dbg("  .log             = %p,", alsa->log);
   tsig_log_dbg("};");
 }
@@ -333,6 +335,7 @@ int tsig_alsa_init(tsig_alsa_t *alsa, tsig_cfg_t *cfg, tsig_log_t *log) {
   snd_pcm_t *pcm;
   int err;
 
+  alsa->timeout = cfg->timeout;
   alsa->log = log;
 
   err = snd_pcm_open(&pcm, cfg->device, SND_PCM_STREAM_PLAYBACK, 0);
@@ -388,6 +391,7 @@ int tsig_alsa_loop(tsig_alsa_t *alsa, tsig_audio_cb_t cb, void *cb_data) {
   struct pollfd *pfds = NULL;
   snd_pcm_uframes_t written;
   snd_pcm_uframes_t remain;
+  struct sigaction sa_alrm;
   struct sigaction sa_term;
   struct sigaction sa_int;
   bool is_running = false;
@@ -430,10 +434,12 @@ int tsig_alsa_loop(tsig_alsa_t *alsa, tsig_audio_cb_t cb, void *cb_data) {
     goto out_free_bufs;
   }
 
-  /* Install signal handler. */
+  /* Install signal handler and set user timeout. */
   sigemptyset(&sa.sa_mask);
   sigaction(SIGINT, &sa, &sa_int);
   sigaction(SIGTERM, &sa, &sa_term);
+  sigaction(SIGALRM, &sa, &sa_alrm);
+  alarm(alsa->timeout);
 
   /*
    * ALSA pulls one period's samples at a time with up to two waits.
@@ -501,8 +507,10 @@ int tsig_alsa_loop(tsig_alsa_t *alsa, tsig_audio_cb_t cb, void *cb_data) {
   }
 
 out_restore_signals:
+  sigaction(SIGALRM, &sa_alrm, NULL);
   sigaction(SIGTERM, &sa_term, NULL);
   sigaction(SIGINT, &sa_int, NULL);
+  alarm(0);
 
 out_free_bufs:
   free(buf);

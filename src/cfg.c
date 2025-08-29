@@ -54,6 +54,7 @@ typedef struct cfg_setter_info {
 static bool cfg_set_station(tsig_cfg_t *cfg, tsig_log_t *log, const char *str);
 static bool cfg_set_offset(tsig_cfg_t *cfg, tsig_log_t *log, const char *str);
 static bool cfg_set_dut1(tsig_cfg_t *cfg, tsig_log_t *log, const char *str);
+static bool cfg_set_timeout(tsig_cfg_t *cfg, tsig_log_t *log, const char *str);
 
 #ifdef TSIG_HAVE_BACKENDS
 static bool cfg_set_backend(tsig_cfg_t *cfg, tsig_log_t *log, const char *str);
@@ -86,6 +87,10 @@ static const long cfg_offset_max = 86400000;
 static const long cfg_dut1_min = -1000;
 static const long cfg_dut1_max = 1000;
 
+/** User timeout limits (exclusive). */
+static const long cfg_timeout_min = 999;
+static const long cfg_timeout_max = 86400000;
+
 /** Channel count limits (exclusive). */
 static const long cfg_channels_min = 0;
 static const long cfg_channels_max = 1024;
@@ -110,11 +115,14 @@ static const char cfg_help_fmt[] = {
     "  -o, --offset=OFFSET      user offset in [+-]HH:mm:ss[.SSS] format\n"
     "  -d, --dut1=DUT1          DUT1 value in ms (only for MSF and WWVB)\n"
     "\n"
+    "Timeout options:\n"
+    "  -t, --timeout=TIMEOUT    time to run before exiting in HH:mm:ss format\n"
+    "\n"
     "Sound options (rarely needed):\n"
 
 #ifdef TSIG_HAVE_BACKENDS
     "  -m, --method=METHOD      output method\n"
-#endif /* TSIG_HAVE_BACKENDS */
+    #endif /* TSIG_HAVE_BACKENDS */
 
 #ifdef TSIG_HAVE_ALSA
     "  -D, --device=DEVICE      output device (only for ALSA)\n"
@@ -141,6 +149,7 @@ static const char cfg_help_fmt[] = {
     "  time station   BPC, DCF77, JJY, JJY60, MSF, WWVB\n"
     "  user offset    -23:59:59.999 to 23:59:59.999\n"
     "  DUT1 value     -999 to 999\n"
+    "  timeout        00:00:01 to 23:59:59\n"
 
 #ifdef TSIG_HAVE_BACKENDS
     "  output method  " TSIG_CFG_BACKENDS "\n"
@@ -169,6 +178,7 @@ static const char cfg_help_fmt[] = {
     "  time station   WWVB\n"
     "  user offset    00:00:00.000\n"
     "  DUT1 value     0\n"
+    "  timeout        forever\n"
 
 #ifdef TSIG_HAVE_BACKENDS
     "  output method  autodetect\n"
@@ -196,6 +206,7 @@ static tsig_cfg_t cfg_default = {
     .station = TSIG_STATION_ID_WWVB,
     .offset = 0,
     .dut1 = 0,
+    .timeout = 0,
 
 #ifdef TSIG_HAVE_BACKENDS
     .backend = TSIG_BACKEND_UNKNOWN,
@@ -220,6 +231,7 @@ static struct option cfg_longopts[] = {
     {"station", required_argument, NULL, 's'},
     {"offset", required_argument, NULL, 'o'},
     {"dut1", required_argument, NULL, 'd'},
+    {"timeout", required_argument, NULL, 't'},
 
 #ifdef TSIG_HAVE_BACKENDS
     {"method", required_argument, NULL, 'm'},
@@ -244,7 +256,7 @@ static struct option cfg_longopts[] = {
 
 /** Short options. */
 static const char cfg_opts[] = {
-    "s:o:d:"
+    "s:o:d:t:"
 
 #ifdef TSIG_HAVE_BACKENDS
     "m:"
@@ -262,6 +274,7 @@ static cfg_setter_info_t cfg_setter_info[] = {
     {"station", &cfg_set_station},
     {"offset", &cfg_set_offset},
     {"dut1", &cfg_set_dut1},
+    {"timeout", &cfg_set_timeout},
 
 #ifdef TSIG_HAVE_BACKENDS
     {"method", &cfg_set_backend},
@@ -435,6 +448,31 @@ static bool cfg_set_dut1(tsig_cfg_t *cfg, tsig_log_t *log, const char *str) {
   }
 
   cfg->dut1 = (int16_t)dut1;
+  return true;
+}
+
+/** Setter for timeout. */
+static bool cfg_set_timeout(tsig_cfg_t *cfg, tsig_log_t *log, const char *str) {
+  long timeout;
+
+  if (!cfg_parse_offset(str, &timeout)) {
+    tsig_log_err("invalid timeout \"%s\"", str);
+    return false;
+  }
+
+  if (!(cfg_timeout_min < timeout && timeout < cfg_timeout_max)) {
+    const char *sign = timeout < 0 ? "-" : "";
+    if (timeout < 0)
+      timeout = -timeout;
+    tsig_log_err(
+        "timeout %s%.02ld:%.02ld:%.02ld must be between 00:00:01 and 23:59:59",
+        sign, timeout / cfg_msecs_hour,
+        (timeout / cfg_msecs_min) % cfg_mins_hour,
+        (timeout / cfg_msecs_sec) % cfg_secs_min);
+    return false;
+  }
+
+  cfg->timeout = (unsigned)timeout / cfg_msecs_sec;
   return true;
 }
 
@@ -780,6 +818,7 @@ static void cfg_print(tsig_cfg_t *cfg, tsig_log_t *log) {
   tsig_log_dbg("  .station    = %s,", station);
   tsig_log_dbg("  .offset     = %d,", cfg->offset);
   tsig_log_dbg("  .dut1       = %hd,", cfg->dut1);
+  tsig_log_dbg("  .timeout    = %u,", cfg->timeout);
 
 #ifdef TSIG_HAVE_BACKENDS
   tsig_log_dbg("  .backend    = %s,", backend);
@@ -822,6 +861,7 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
   bool got_station = false;
   bool got_offset = false;
   bool got_dut1 = false;
+  bool got_timeout = false;
 
 #ifdef TSIG_HAVE_BACKENDS
   bool got_backend = false;
@@ -860,6 +900,10 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
       case 'd':
         is_ok = cfg_set_dut1(cfg, log, optarg);
         got_dut1 = true;
+        break;
+      case 't':
+        is_ok = cfg_set_timeout(cfg, log, optarg);
+        got_timeout = true;
         break;
 
 #ifdef TSIG_HAVE_BACKENDS
@@ -932,6 +976,8 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
     cfg->offset = cfg_file.offset;
   if (!got_dut1)
     cfg->dut1 = cfg_file.dut1;
+  if (!got_timeout)
+    cfg->timeout = cfg_file.timeout;
 
 #ifdef TSIG_HAVE_BACKENDS
   if (!got_backend)

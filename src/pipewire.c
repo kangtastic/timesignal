@@ -18,6 +18,8 @@
 #include <stdint.h>
 #include <signal.h>
 
+#include <unistd.h>
+
 #include <spa/param/audio/format-utils.h>
 #include <pipewire/pipewire.h>
 
@@ -147,6 +149,7 @@ static void pipewire_print(tsig_pipewire_t *pipewire) {
   tsig_log_dbg("  .stride       = %u,", pipewire->stride);
   tsig_log_dbg("  .size         = %u,", pipewire->size);
   tsig_log_dbg("  .audio_format = %s,", audio_format);
+  tsig_log_dbg("  .timeout      = %u,", pipewire->timeout);
   tsig_log_dbg("  .log          = %p,", log);
   tsig_log_dbg("};");
 }
@@ -174,6 +177,7 @@ int tsig_pipewire_init(tsig_pipewire_t *pipewire, tsig_cfg_t *cfg,
   int err = -1;
 
   *pipewire = (tsig_pipewire_t){
+      .timeout = cfg->timeout,
       .log = log,
   };
 
@@ -293,15 +297,22 @@ out_deinit:
  */
 int tsig_pipewire_loop(tsig_pipewire_t *pipewire, tsig_audio_cb_t cb,
                        void *cb_data) {
-  /* Install PipeWire signal handler. */
   struct pw_loop *loop = pw_main_loop_get_loop(pipewire->loop);
+  int err;
+
+  /* Install PipeWire signal handler. */
   pw_loop_add_signal(loop, SIGINT, pipewire_on_signal, pipewire);
   pw_loop_add_signal(loop, SIGTERM, pipewire_on_signal, pipewire);
+  pw_loop_add_signal(loop, SIGALRM, pipewire_on_signal, pipewire);
 
   pipewire->cb = cb;
   pipewire->cb_data = cb_data;
 
-  return pw_main_loop_run(pipewire->loop);
+  alarm(pipewire->timeout);
+  err = pw_main_loop_run(pipewire->loop);
+  alarm(0);
+
+  return err;
 }
 
 /**
