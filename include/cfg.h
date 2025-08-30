@@ -37,6 +37,7 @@ typedef enum tsig_cfg_init_result {
 /** Program configuration. */
 typedef struct tsig_cfg {
   tsig_station_id_t station; /** Time station. */
+  int64_t base;              /** Time base in milliseconds since epoch. */
   int32_t offset;            /** User offset in milliseconds. */
   int16_t dut1;              /** DUT1 value in milliseconds. */
 

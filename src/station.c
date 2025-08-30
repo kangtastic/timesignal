@@ -23,6 +23,9 @@
 /** Buffer size. */
 #define TSIG_STATION_MESSAGE_SIZE 128
 
+/** First run indicator. */
+static const uint64_t station_first_run = UINT64_MAX;
+
 /** Maximum allowed time drift in milliseconds. */
 static const uint64_t station_drift_threshold = 500;
 
@@ -682,6 +685,7 @@ void station_print(tsig_station_t *station) {
   tsig_log_t *log = station->log;
   tsig_log_dbg("tsig_station_t %p = {", station);
   tsig_log_dbg("  .station        = %s,", station_name);
+  tsig_log_dbg("  .base           = %ld,", station->base);
   tsig_log_dbg("  .offset         = %d,", station->offset);
   tsig_log_dbg("  .dut1           = %hd,", station->dut1);
   tsig_log_dbg("  .smooth         = %d,", station->smooth);
@@ -689,6 +693,7 @@ void station_print(tsig_station_t *station) {
   tsig_log_dbg("  .xmit_level     = {");
   station_xmit_level_print(log, station->xmit_level);
   tsig_log_dbg("  },");
+  tsig_log_dbg("  .base_offset    = %ld,", station->base_offset);
   tsig_log_dbg("  .timestamp      = %lu,", station->timestamp);
   tsig_log_dbg("  .next_timestamp = %lu,", station->next_timestamp);
   tsig_log_dbg("  .samples_tick   = %lu,", station->samples_tick);
@@ -734,12 +739,28 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size) {
   bool is_jjy = station->station == TSIG_STATION_ID_JJY ||
                 station->station == TSIG_STATION_ID_JJY60;
 
-  /*
-   * Resync on first run, sample rate change,
-   * or unexpected clock drift (e.g. due to NTP).
-   */
-  uint64_t now = tsig_datetime_get_timestamp() + station->offset;
+  uint64_t now = tsig_datetime_get_timestamp();
   uint64_t expected = station->next_timestamp;
+
+  /*
+   * On first run, calculate the offset to apply to the system time such
+   * that we start transmitting from the configured time base + user offset.
+   */
+
+  if (expected == station_first_run)
+    station->base_offset = station->base != TSIG_STATION_BASE_SYSTEM
+                               ? station->base - (int64_t)now + station->offset
+                               : station->offset;
+
+  /*
+   * This calculation may overflow if the time base is close to the start
+   * of the epoch and the user offset is negative and/or the system clock
+   * is set (far) backward during runtime. Resolution: worksforme, wontfix~
+   */
+
+  now += station->base_offset;
+
+  /* Resync on first run, sample rate change, or clock drift (e.g. NTP). */
   uint64_t drift = now > expected ? now - expected : expected - now;
 
   if (drift > station_drift_threshold) {
@@ -785,7 +806,7 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size) {
             datetime.year, datetime.mon, datetime.day, datetime.hour,
             datetime.min, datetime.sec, datetime.msec);
 
-    if (expected) {
+    if (expected && expected != station_first_run) {
       tsig_log_note("Resynced to %s UTC.", msg);
       tsig_log_note("System clock was %lu ms %s than expected.", drift,
                     now < expected ? "less" : "more");
@@ -888,15 +909,18 @@ void tsig_station_init(tsig_station_t *station, tsig_cfg_t *cfg,
   int32_t offset = cfg->offset;
   uint32_t rate = cfg->rate;
   bool smooth = cfg->smooth;
+  int64_t base = cfg->base;
   int16_t dut1 = cfg->dut1;
 
   *station = (tsig_station_t){
       .station = station_id,
+      .base = base,
       .offset = offset,
       .dut1 = dut1,
       .smooth = smooth,
       .rate = rate,
       .xmit_level = {0},
+      .next_timestamp = station_first_run,
       .samples_tick = rate * TSIG_STATION_MSECS_TICK / 1000,
       .log = log,
   };
@@ -929,14 +953,20 @@ void tsig_station_init(tsig_station_t *station, tsig_cfg_t *cfg,
   station->freq = freq / subharmonic;
 
   char msg[TSIG_STATION_MESSAGE_SIZE];
-  bool is_negative = offset < 0;
-  tsig_datetime_t datetime =
-      tsig_datetime_parse_timestamp(is_negative ? -offset : offset);
+  const char *sign = offset < 0 ? "-" : "";
+  int32_t coeff = offset < 0 ? -1 : 1;
+  tsig_datetime_t datetime = tsig_datetime_parse_timestamp(coeff * offset);
   int len;
 
-  len = sprintf(msg, "Starting %s adjusted by %s%02hhu:%02hhu:%02hhu.%03hu",
-                tsig_station_name(station_id), is_negative ? "-" : "",
-                datetime.hour, datetime.min, datetime.sec, datetime.msec);
+  len = sprintf(msg, "Starting %s", tsig_station_name(station_id));
+  if (base >= 0) {
+    tsig_datetime_t base_datetime = tsig_datetime_parse_timestamp(base);
+    len += sprintf(&msg[len], " from %04hu-%02hhu-%02hhu %02hhu:%02hhu:%02hhu",
+                   base_datetime.year, base_datetime.mon, base_datetime.day,
+                   base_datetime.hour, base_datetime.min, base_datetime.sec);
+  }
+  len += sprintf(&msg[len], " adjusted by %s%02hhu:%02hhu:%02hhu.%03hu", sign,
+                 datetime.hour, datetime.min, datetime.sec, datetime.msec);
   if (station_id == TSIG_STATION_ID_MSF || station_id == TSIG_STATION_ID_WWVB)
     len += sprintf(&msg[len], ", DUT1 %hd ms", dut1);
 

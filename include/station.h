@@ -25,6 +25,9 @@ typedef struct tsig_log tsig_log_t;
 #define TSIG_STATION_TICKS_SEC  (1000 / TSIG_STATION_MSECS_TICK)
 #define TSIG_STATION_TICKS_MIN  (60 * TSIG_STATION_TICKS_SEC)
 
+/** Our default time base is the system time. */
+#define TSIG_STATION_BASE_SYSTEM -1
+
 /** Time station IDs. */
 typedef enum tsig_station_id {
   TSIG_STATION_ID_UNKNOWN = -1,
@@ -39,6 +42,7 @@ typedef enum tsig_station_id {
 /** Time station waveform generator context. */
 typedef struct tsig_station {
   tsig_station_id_t station; /** Time station ID. */
+  int64_t base;              /** Time base in milliseconds since epoch. */
   int32_t offset;            /** User offset in milliseconds. */
   int16_t dut1;              /** DUT1 value in milliseconds. */
   bool smooth;               /** Whether to interpolate rapid gain changes. */
@@ -47,6 +51,7 @@ typedef struct tsig_station {
   /** Bitfield of per-tick transmit level flags for current station minute. */
   uint8_t xmit_level[TSIG_STATION_TICKS_MIN / CHAR_BIT];
 
+  int64_t base_offset;     /** Base timestamp offset relative to system time. */
   uint64_t timestamp;      /** Base timestamp of this station context. */
   uint64_t next_timestamp; /** Expected timestamp when next invoked. */
   uint64_t samples_tick;   /** Sample count per tick. */

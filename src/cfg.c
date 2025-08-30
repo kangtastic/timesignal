@@ -11,6 +11,7 @@
 
 #include "audio.h"
 #include "backend.h"
+#include "datetime.h"
 #include "defaults.h"
 #include "log.h"
 #include "station.h"
@@ -52,6 +53,7 @@ typedef struct cfg_setter_info {
 
 /** Forward declarations for function prototypes. */
 static bool cfg_set_station(tsig_cfg_t *cfg, tsig_log_t *log, const char *str);
+static bool cfg_set_base(tsig_cfg_t *cfg, tsig_log_t *log, const char *str);
 static bool cfg_set_offset(tsig_cfg_t *cfg, tsig_log_t *log, const char *str);
 static bool cfg_set_dut1(tsig_cfg_t *cfg, tsig_log_t *log, const char *str);
 static bool cfg_set_timeout(tsig_cfg_t *cfg, tsig_log_t *log, const char *str);
@@ -106,6 +108,7 @@ static const char cfg_help_fmt[] = {
     "\n"
     "Time signal options:\n"
     "  -s, --station=STATION    time station to emulate\n"
+    "  -b, --base=BASE          time base in YYYY-MM-DD HH:mm:ss[(+-)hhmm] format\n"
     "  -o, --offset=OFFSET      user offset in [+-]HH:mm:ss[.SSS] format\n"
     "  -d, --dut1=DUT1          DUT1 value in ms (only for MSF and WWVB)\n"
     "\n"
@@ -141,6 +144,7 @@ static const char cfg_help_fmt[] = {
     "\n"
     "Recognized option values (not all work on all systems):\n"
     "  time station   BPC, DCF77, JJY, JJY60, MSF, WWVB\n"
+    "  time base      1970-01-01 00:00:00+0000 to 9999-12-31 23:59:59+2359\n"
     "  user offset    -23:59:59.999 to 23:59:59.999\n"
     "  DUT1 value     -999 to 999\n"
     "  timeout        00:00:01 to 23:59:59\n"
@@ -170,6 +174,7 @@ static const char cfg_help_fmt[] = {
     "\n"
     "Default option values:\n"
     "  time station   WWVB\n"
+    "  time base      current system time\n"
     "  user offset    00:00:00.000\n"
     "  DUT1 value     0\n"
     "  timeout        forever\n"
@@ -198,6 +203,7 @@ static const char cfg_help_fmt[] = {
 /** Default program configuration. */
 static tsig_cfg_t cfg_default = {
     .station = TSIG_STATION_ID_WWVB,
+    .base = TSIG_STATION_BASE_SYSTEM,
     .offset = 0,
     .dut1 = 0,
     .timeout = 0,
@@ -223,6 +229,7 @@ static tsig_cfg_t cfg_default = {
 /** Long options. */
 static struct option cfg_longopts[] = {
     {"station", required_argument, NULL, 's'},
+    {"base", required_argument, NULL, 'b'},
     {"offset", required_argument, NULL, 'o'},
     {"dut1", required_argument, NULL, 'd'},
     {"timeout", required_argument, NULL, 't'},
@@ -250,7 +257,7 @@ static struct option cfg_longopts[] = {
 
 /** Short options. */
 static const char cfg_opts[] = {
-    "s:o:d:t:"
+    "s:b:o:d:t:"
 
 #ifdef TSIG_HAVE_BACKENDS
     "m:"
@@ -266,6 +273,7 @@ static const char cfg_opts[] = {
 /** Setter functions for a configuration file. */
 static cfg_setter_info_t cfg_setter_info[] = {
     {"station", &cfg_set_station},
+    {"base", &cfg_set_base},
     {"offset", &cfg_set_offset},
     {"dut1", &cfg_set_dut1},
     {"timeout", &cfg_set_timeout},
@@ -390,6 +398,123 @@ static bool cfg_parse_offset(const char *str, long *out_msecs) {
   return true;
 }
 
+/** Parse a string in YYYY-[M]M-[D]D [H]H:[m]m[:[s]s][(+-)hhmm] format. */
+static bool cfg_parse_base(const char *str, int64_t *out_msecs) {
+  const char *l = NULL;
+  const char *r = NULL;
+  const char *s = str;
+  bool tz_neg = false;
+  int tz_hour = 0;
+  int tz_min = 0;
+  int sec = 0;
+  int year;
+  int mon;
+  int day;
+  int hour;
+  int min;
+  int tz;
+
+  /* Find the trimmed bounds of the string. */
+  for (; *s; s++) {
+    if (!isspace(*s)) {
+      if (!l)
+        l = s;
+      r = s + 1;
+    }
+  }
+
+  /* Ensure we have something to parse. */
+  if (!l)
+    return false;
+
+  s = l;
+
+  /* Parse the date. */
+  if (!(isdigit(s[0]) && isdigit(s[1]) && isdigit(s[2]) && isdigit(s[3])))
+    return false;
+  year = 1000 * (*s++ - '0');
+  year += 100 * (*s++ - '0');
+  year += 10 * (*s++ - '0');
+  year += *s++ - '0';
+  if (!(1970 <= year && year <= 9999 && *s++ == '-'))
+    return false;
+  if (!isdigit(*s))
+    return false;
+  mon = *s++ - '0';
+  if (isdigit(*s))
+    mon = 10 * mon + (*s++ - '0');
+  if (!(1 <= mon && mon <= 12 && *s++ == '-'))
+    return false;
+  if (!isdigit(*s))
+    return false;
+  day = *s++ - '0';
+  if (isdigit(*s))
+    day = 10 * day + (*s++ - '0');
+  if (!(1 <= day && day <= tsig_datetime_days_in_mon(year, mon) && *s++ == ' '))
+    return false;
+
+  /* Parse hours and minutes. */
+  if (!isdigit(*s))
+    return false;
+  hour = *s++ - '0';
+  if (isdigit(*s))
+    hour = 10 * hour + (*s++ - '0');
+  if (!(0 <= hour && hour <= 23 && *s++ == ':'))
+    return false;
+  if (!isdigit(*s))
+    return false;
+  min = *s++ - '0';
+  if (isdigit(*s))
+    min = 10 * min + (*s++ - '0');
+  if (!(0 <= min && min <= 59))
+    return false;
+
+  /* Parse seconds if they exist. */
+  if (*s == ':') {
+    if (!isdigit(*++s))
+      return false;
+    sec = *s++ - '0';
+    if (isdigit(*s))
+      sec = 10 * sec + (*s++ - '0');
+    if (!(0 <= sec && sec <= 59))
+      return false;
+  }
+
+  /* Parse the timezone if it exists. */
+  if (*s == '+' || *s == '-') {
+    tz_neg = *s++ == '-';
+    if (!(isdigit(s[0]) && isdigit(s[1]) && isdigit(s[2]) && isdigit(s[3])))
+      return false;
+    tz_hour = 10 * (*s++ - '0');
+    tz_hour += *s++ - '0';
+    if (!(0 <= tz_hour && tz_hour <= 23))
+      return false;
+    tz_min = 10 * (*s++ - '0');
+    tz_min += *s++ - '0';
+    if (!(0 <= tz_min && tz_min <= 59))
+      return false;
+  }
+
+  /* Ensure we have nothing more to parse. */
+  if (s != r)
+    return false;
+
+  /* Calculate the timezone offset (in minutes). */
+  tz = 60 * tz_hour + tz_min;
+  if (tz_neg)
+    tz = -tz;
+
+  /* Ensure the date and time we parsed isn't before the epoch. */
+  if (year == 1970 && mon == 1 && day == 1 &&
+      3600 * hour + 60 * min + sec - 60 * tz < 0)
+    return false;
+
+  *out_msecs =
+      tsig_datetime_make_timestamp(year, mon, day, hour, min, sec, 0, tz);
+
+  return true;
+}
+
 /** Parse a string to a long with error detection. */
 static bool cfg_strtol(const char *str, long *out_n) {
   char *endptr;
@@ -424,6 +549,22 @@ static bool cfg_set_station(tsig_cfg_t *cfg, tsig_log_t *log, const char *str) {
   }
 
   cfg->station = station;
+  return true;
+}
+
+/** Setter for base. */
+static bool cfg_set_base(tsig_cfg_t *cfg, tsig_log_t *log, const char *str) {
+  int64_t base;
+
+  if (!cfg_parse_base(str, &base)) {
+    tsig_log_err(
+        "invalid base time \"%s\" must be between "
+        "1970-01-01 00:00:00+0000 and 9999-12-31 23:59:59+2359",
+        str);
+    return false;
+  }
+
+  cfg->base = base;
   return true;
 }
 
@@ -816,6 +957,7 @@ static void cfg_print(tsig_cfg_t *cfg, tsig_log_t *log) {
 
   tsig_log_dbg("tsig_cfg_t %p = {", cfg);
   tsig_log_dbg("  .station    = %s,", station);
+  tsig_log_dbg("  .base       = %ld,", cfg->base);
   tsig_log_dbg("  .offset     = %d,", cfg->offset);
   tsig_log_dbg("  .dut1       = %hd,", cfg->dut1);
   tsig_log_dbg("  .timeout    = %u,", cfg->timeout);
@@ -859,6 +1001,7 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
   int opt;
 
   bool got_station = false;
+  bool got_base = false;
   bool got_offset = false;
   bool got_dut1 = false;
   bool got_timeout = false;
@@ -892,6 +1035,10 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
       case 's':
         is_ok = cfg_set_station(cfg, log, optarg);
         got_station = true;
+        break;
+      case 'b':
+        is_ok = cfg_set_base(cfg, log, optarg);
+        got_base = true;
         break;
       case 'o':
         is_ok = cfg_set_offset(cfg, log, optarg);
@@ -972,6 +1119,8 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
   /* Directly provided options supersede those from a config file. */
   if (!got_station)
     cfg->station = cfg_file.station;
+  if (!got_base)
+    cfg->base = cfg_file.base;
   if (!got_offset)
     cfg->offset = cfg_file.offset;
   if (!got_dut1)

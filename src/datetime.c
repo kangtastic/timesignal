@@ -76,6 +76,44 @@ tsig_datetime_t tsig_datetime_parse_timestamp(int64_t timestamp) {
 }
 
 /**
+ * Create a timestamp from date and time components.
+ *
+ * @param year Year (0 and up).
+ * @param mon Month (1-12).
+ * @param day Day of month (1-31).
+ * @param hour Hour (0-23).
+ * @param min Minute (0-59).
+ * @param sec Second (0-59).
+ * @param msec Millisecond (0-999).
+ * @param tz Timezone offset in minutes.
+ * @return Unix timestamp in milliseconds.
+ *  Negative timestamps before the epoch are clamped to 0.
+ */
+int64_t tsig_datetime_make_timestamp(uint16_t year, uint8_t mon, uint8_t day,
+                                     uint8_t hour, uint8_t min, uint8_t sec,
+                                     uint16_t msec, int16_t tz) {
+  /*
+   * Certain date calculations are simplified by shifting the
+   * epoch to begin on March 1, 0000 instead of January 1, 1970.
+   * cf. https://howardhinnant.github.io/date_algorithms.html
+   */
+
+  int64_t y = (int64_t)year - (mon <= 2);
+  int64_t era = (y < 0 ? y - 399 : y) / 400;
+  int32_t yoe = y - era * 400;
+  int32_t m = mon > 2 ? mon - 3 : mon + 9;
+  int32_t doy = (153 * m + 2) / 5 + day - 1;
+  int32_t doe = 365 * yoe + yoe / 4 - yoe / 100 + doy;
+  int64_t dse = era * 146097 + doe - 719468;
+
+  int64_t timestamp = dse * datetime_msecs_day + datetime_msecs_hour * hour +
+                      datetime_msecs_min * min - datetime_msecs_min * tz +
+                      1000 * sec + msec;
+
+  return timestamp < 0 ? 0 : timestamp;
+}
+
+/**
  * Determine whether a year is a leap year.
  *
  * @param year Gregorian year.
@@ -83,6 +121,18 @@ tsig_datetime_t tsig_datetime_parse_timestamp(int64_t timestamp) {
  */
 bool tsig_datetime_is_leap(uint16_t year) {
   return !(year % 4) && ((year % 100) || !(year % 400));
+}
+
+/**
+ * Determine the number of days in a month.
+ *
+ * @param year Gregorian year.
+ * @param mon Month (1-12).
+ * @return Number of days in the given month.
+ */
+uint8_t tsig_datetime_days_in_mon(uint16_t year, uint8_t mon) {
+  const uint8_t days[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+  return days[mon - 1] + (mon == 2 && tsig_datetime_is_leap(year));
 }
 
 /**
