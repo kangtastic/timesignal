@@ -79,10 +79,6 @@ static bool cfg_set_verbosity(tsig_cfg_t *cfg, tsig_log_t *log,
 static void cfg_print(tsig_cfg_t *cfg, tsig_log_t *log);
 #endif /* TSIG_DEBUG */
 
-/** User offset limits (exclusive). */
-static const long cfg_offset_min = -86400000;
-static const long cfg_offset_max = 86400000;
-
 /** DUT1 limits (exclusive). */
 static const long cfg_dut1_min = -1000;
 static const long cfg_dut1_max = 1000;
@@ -99,8 +95,6 @@ static const long cfg_channels_max = 1024;
 static const long cfg_msecs_hour = 3600000;
 static const long cfg_msecs_min = 60000;
 static const long cfg_msecs_sec = 1000;
-static const long cfg_mins_hour = 60;
-static const long cfg_secs_min = 60;
 
 /** Help string. */
 static const char cfg_help_fmt[] = {
@@ -295,17 +289,20 @@ static cfg_setter_info_t cfg_setter_info[] = {
     {NULL, NULL},
 };
 
-/** Parse a string in [[[+-]HH:]mm:]ss[.SSS] format. */
+/** Parse a string in [+-][[H]H:][[m]m:][s]s[.[S[S[S]]]] format. */
 static bool cfg_parse_offset(const char *str, long *out_msecs) {
   const char *l = NULL;
   const char *p = NULL;
   const char *r = NULL;
-  int64_t mul = 100;
-  int64_t msecs = 0;
-  int colons = 0;
+  const char *s = str;
+  long sign = 1;
+  long hour = 0;
+  long min = 0;
+  long sec = 0;
+  long msec = 0;
 
   /* Find the trimmed bounds of the string and the floating point. */
-  for (const char *s = str; *s; s++) {
+  for (; *s; s++) {
     if (!isspace(*s)) {
       if (!l)
         l = s;
@@ -319,53 +316,76 @@ static bool cfg_parse_offset(const char *str, long *out_msecs) {
     }
   }
 
+  /* Ensure we have something to parse. */
+  if (!l)
+    return false;
+
   /* Parse up to three digits from the right of the floating point. */
   if (p) {
     /* Floating point must be preceded or followed by a digit. */
-    if (!(l < p && isdigit(*(p - 1))) && !(p + 1 < r && isdigit(*(p + 1))))
+    if (!((l < p && isdigit(p[-1])) || (p + 1 < r && isdigit(p[1]))))
       return false;
-    for (const char *s = p + 1; s < r; s++) {
-      if (isdigit(*s)) {
-        if (mul) {
-          msecs += mul * (*s - '0');
-          mul /= 10;
-        }
-      } else {
+    s = p + 1;
+    if (s < r && isdigit(*s))
+      msec += 100 * (*s++ - '0');
+    if (s < r && isdigit(*s))
+      msec += 10 * (*s++ - '0');
+    if (s < r && isdigit(*s))
+      msec += *s++ - '0';
+    /* Consume remaining digits. */
+    for (; s < r; s++)
+      if (!isdigit(*s))
         return false;
-      }
-    }
+    r = p;
   }
 
-  /* Parse the rest of the string, checking for overflow. */
-  mul = cfg_msecs_sec;
+  s = r - 1;
 
-  for (const char *s = p ? p - 1 : r - 1; s >= l; s--) {
-    if (*s == '+' || *s == '-') {
-      /* Sign must be leftmost. */
-      if (s != l)
-        return false;
-      if (*s == '-')
-        msecs = -msecs;
-    } else if (*s == ':') {
-      /* Up to two colons, and they must be preceded by a digit. */
-      if (l < s && isdigit(*(s - 1)) && colons < 2)
-        mul = colons++ ? cfg_msecs_hour : cfg_msecs_min;
-      else
-        return false;
-    } else if (isdigit(*s)) {
-      msecs += mul * (*s - '0');
-      mul *= 10;
-      if (mul > INT_MAX)
-        return false;
-    } else {
+  /* Parse seconds. */
+  if (!(l <= s && isdigit(*s)))
+    return false;
+  sec += *s-- - '0';
+  if (l <= s && isdigit(*s))
+    sec += 10 * (*s-- - '0');
+  if (!(0 <= sec && sec <= 59))
+    return false;
+
+  /* Parse minutes if they exist. */
+  if (l <= s && *s == ':') {
+    if (!(l < s && isdigit(*--s)))
       return false;
-    }
-
-    if (!(INT_MIN <= msecs && msecs <= INT_MAX))
+    min += *s-- - '0';
+    if (l <= s && isdigit(*s))
+      min += 10 * (*s-- - '0');
+    if (!(0 <= min && min <= 59))
       return false;
   }
 
-  *out_msecs = (long)msecs;
+  /* Parse hours if they exist. */
+  if (l <= s && *s == ':') {
+    if (!(l < s && isdigit(*--s)))
+      return false;
+    hour += *s-- - '0';
+    if (l <= s && isdigit(*s))
+      hour += 10 * (*s-- - '0');
+    if (!(0 <= hour && hour <= 23))
+      return false;
+  }
+
+  /* Parse the sign if it exists. */
+  if (l <= s && (*s == '+' || *s == '-'))
+    if (*s-- == '-')
+      sign = -1;
+
+  /* Ensure we have nothing more to parse. */
+  if (l != s + 1)
+    return false;
+
+  *out_msecs = cfg_msecs_hour * hour;
+  *out_msecs += cfg_msecs_min * min;
+  *out_msecs += cfg_msecs_sec * sec;
+  *out_msecs += msec;
+  *out_msecs *= sign;
 
   return true;
 }
@@ -412,19 +432,9 @@ static bool cfg_set_offset(tsig_cfg_t *cfg, tsig_log_t *log, const char *str) {
   long offset;
 
   if (!cfg_parse_offset(str, &offset)) {
-    tsig_log_err("invalid offset \"%s\"", str);
-    return false;
-  }
-
-  if (!(cfg_offset_min < offset && offset < cfg_offset_max)) {
-    const char *sign = offset < 0 ? "-" : "";
-    if (offset < 0)
-      offset = -offset;
     tsig_log_err(
-        "offset %s%.02ld:%.02ld:%.02ld.%.03ld must be between "
-        "-23:59:59.999 and 23:59:59.999",
-        sign, offset / cfg_msecs_hour, (offset / cfg_msecs_min) % cfg_mins_hour,
-        (offset / cfg_msecs_sec) % cfg_secs_min, offset % cfg_msecs_sec);
+        "invalid offset \"%s\" must be between -23:59:59.999 and 23:59:59.999",
+        str);
     return false;
   }
 
@@ -455,20 +465,10 @@ static bool cfg_set_dut1(tsig_cfg_t *cfg, tsig_log_t *log, const char *str) {
 static bool cfg_set_timeout(tsig_cfg_t *cfg, tsig_log_t *log, const char *str) {
   long timeout;
 
-  if (!cfg_parse_offset(str, &timeout)) {
-    tsig_log_err("invalid timeout \"%s\"", str);
-    return false;
-  }
-
-  if (!(cfg_timeout_min < timeout && timeout < cfg_timeout_max)) {
-    const char *sign = timeout < 0 ? "-" : "";
-    if (timeout < 0)
-      timeout = -timeout;
-    tsig_log_err(
-        "timeout %s%.02ld:%.02ld:%.02ld must be between 00:00:01 and 23:59:59",
-        sign, timeout / cfg_msecs_hour,
-        (timeout / cfg_msecs_min) % cfg_mins_hour,
-        (timeout / cfg_msecs_sec) % cfg_secs_min);
+  if (!cfg_parse_offset(str, &timeout) ||
+      (!(cfg_timeout_min < timeout && timeout < cfg_timeout_max))) {
+    tsig_log_err("invalid timeout \"%s\" must be between 00:00:01 and 23:59:59",
+                 str);
     return false;
   }
 
