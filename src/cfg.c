@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <limits.h>
 #include <string.h>
 
@@ -957,9 +958,9 @@ static void cfg_print(tsig_cfg_t *cfg, tsig_log_t *log) {
 
   tsig_log_dbg("tsig_cfg_t %p = {", cfg);
   tsig_log_dbg("  .station    = %s,", station);
-  tsig_log_dbg("  .base       = %ld,", cfg->base);
-  tsig_log_dbg("  .offset     = %d,", cfg->offset);
-  tsig_log_dbg("  .dut1       = %hd,", cfg->dut1);
+  tsig_log_dbg("  .base       = %" PRIi64 ",", cfg->base);
+  tsig_log_dbg("  .offset     = %" PRIi32 ",", cfg->offset);
+  tsig_log_dbg("  .dut1       = %" PRIi16 ",", cfg->dut1);
   tsig_log_dbg("  .timeout    = %u,", cfg->timeout);
 
 #ifdef TSIG_HAVE_BACKENDS
@@ -971,8 +972,8 @@ static void cfg_print(tsig_cfg_t *cfg, tsig_log_t *log) {
 #endif /* TSIG_HAVE_ALSA */
 
   tsig_log_dbg("  .format     = %s,", format);
-  tsig_log_dbg("  .rate       = %u,", cfg->rate);
-  tsig_log_dbg("  .channels   = %hu,", cfg->channels);
+  tsig_log_dbg("  .rate       = %" PRIu32 ",", cfg->rate);
+  tsig_log_dbg("  .channels   = %" PRIu16 ",", cfg->channels);
   tsig_log_dbg("  .smooth     = %d,", cfg->smooth);
   tsig_log_dbg("  .ultrasound = %d,", cfg->ultrasound);
   tsig_log_dbg("  .log_file   = \"%s\",", cfg->log_file);

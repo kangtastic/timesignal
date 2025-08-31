@@ -141,13 +141,13 @@ static void pipewire_print(tsig_pipewire_t *pipewire) {
   tsig_log_dbg("  .loop         = %p,", pipewire->loop);
   tsig_log_dbg("  .stream       = %p,", pipewire->stream);
   tsig_log_dbg("  .format       = %s,", format);
-  tsig_log_dbg("  .rate         = %u,", pipewire->rate);
-  tsig_log_dbg("  .channels     = %u,", pipewire->channels);
+  tsig_log_dbg("  .rate         = %" PRIu32 ",", pipewire->rate);
+  tsig_log_dbg("  .channels     = %" PRIu16 ",", pipewire->channels);
   tsig_log_dbg("  .cb           = %p,", pipewire->cb);
   tsig_log_dbg("  .cb_data      = %p,", pipewire->cb_data);
   tsig_log_dbg("  .cb_buf       = %p,", pipewire->cb_buf);
-  tsig_log_dbg("  .stride       = %u,", pipewire->stride);
-  tsig_log_dbg("  .size         = %u,", pipewire->size);
+  tsig_log_dbg("  .stride       = %" PRIu32 ",", pipewire->stride);
+  tsig_log_dbg("  .size         = %" PRIu32 ",", pipewire->size);
   tsig_log_dbg("  .audio_format = %s,", audio_format);
   tsig_log_dbg("  .timeout      = %u,", pipewire->timeout);
   tsig_log_dbg("  .log          = %p,", log);
@@ -200,8 +200,8 @@ int tsig_pipewire_init(tsig_pipewire_t *pipewire, tsig_cfg_t *cfg,
 
   if (channels > SPA_AUDIO_MAX_CHANNELS) {
     channels = SPA_AUDIO_MAX_CHANNELS;
-    tsig_log_note("failed to set channels %hu, fallback to %hu", cfg->channels,
-                  channels);
+    tsig_log_note("failed to set channels %" PRIu16 ", fallback to %" PRIu16,
+                  cfg->channels, channels);
   }
 
   pw_init(NULL, NULL);
@@ -220,9 +220,9 @@ int tsig_pipewire_init(tsig_pipewire_t *pipewire, tsig_cfg_t *cfg,
       NULL
   );
   /* clang-format on */
-  pw_properties_setf(props, PW_KEY_NODE_RATE, "1/%u", cfg->rate);
-  pw_properties_setf(props, PW_KEY_NODE_LATENCY, "%u/%u", buffer_size,
-                     cfg->rate);
+  pw_properties_setf(props, PW_KEY_NODE_RATE, "1/%" PRIu32, cfg->rate);
+  pw_properties_setf(props, PW_KEY_NODE_LATENCY, "%" PRIu32 "/%" PRIu32,
+                     buffer_size, cfg->rate);
   loop = pw_main_loop_get_loop(pipewire->loop);
 
   pipewire->stream =
@@ -273,8 +273,10 @@ int tsig_pipewire_init(tsig_pipewire_t *pipewire, tsig_cfg_t *cfg,
   }
 
 #ifndef TSIG_DEBUG
-  tsig_log_dbg("started PipeWire stream %s %u Hz %uch, buffer %lu",
-               pipewire_format_name(format), cfg->rate, channels, buffer_size);
+  tsig_log_dbg(
+      "started PipeWire stream %s"
+      " %" PRIu32 " Hz %" PRIu16 "ch, buffer %" PRIu32,
+      pipewire_format_name(format), cfg->rate, channels, buffer_size);
 #else
   pipewire_print(pipewire);
 #endif /* TSIG_DEBUG */

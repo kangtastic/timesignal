@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <limits.h>
 #include <syslog.h>
 
@@ -685,35 +686,35 @@ void station_print(tsig_station_t *station) {
   tsig_log_t *log = station->log;
   tsig_log_dbg("tsig_station_t %p = {", station);
   tsig_log_dbg("  .station        = %s,", station_name);
-  tsig_log_dbg("  .base           = %ld,", station->base);
-  tsig_log_dbg("  .offset         = %d,", station->offset);
-  tsig_log_dbg("  .dut1           = %hd,", station->dut1);
+  tsig_log_dbg("  .base           = %" PRIi64 ",", station->base);
+  tsig_log_dbg("  .offset         = %" PRIi32 ",", station->offset);
+  tsig_log_dbg("  .dut1           = %" PRIi16 ",", station->dut1);
   tsig_log_dbg("  .smooth         = %d,", station->smooth);
-  tsig_log_dbg("  .rate           = %u,", station->rate);
+  tsig_log_dbg("  .rate           = %" PRIu32 ",", station->rate);
   tsig_log_dbg("  .xmit_level     = {");
   station_xmit_level_print(log, station->xmit_level);
   tsig_log_dbg("  },");
-  tsig_log_dbg("  .base_offset    = %ld,", station->base_offset);
-  tsig_log_dbg("  .timestamp      = %lu,", station->timestamp);
-  tsig_log_dbg("  .next_timestamp = %lu,", station->next_timestamp);
-  tsig_log_dbg("  .samples_tick   = %lu,", station->samples_tick);
-  tsig_log_dbg("  .samples        = %lu,", station->samples);
-  tsig_log_dbg("  .next_tick      = %lu,", station->next_tick);
-  tsig_log_dbg("  .tick           = %hu,", station->tick);
+  tsig_log_dbg("  .base_offset    = %" PRIi64 ",", station->base_offset);
+  tsig_log_dbg("  .timestamp      = %" PRIu64 ",", station->timestamp);
+  tsig_log_dbg("  .next_timestamp = %" PRIu64 ",", station->next_timestamp);
+  tsig_log_dbg("  .samples_tick   = %" PRIu64 ",", station->samples_tick);
+  tsig_log_dbg("  .samples        = %" PRIu64 ",", station->samples);
+  tsig_log_dbg("  .next_tick      = %" PRIu64 ",", station->next_tick);
+  tsig_log_dbg("  .tick           = %" PRIu16 ",", station->tick);
   tsig_log_dbg("  .is_morse       = %d,", station->is_morse);
   tsig_log_dbg("  .iir            = {");
-  tsig_log_dbg("    .freq    = %u,", station->iir.freq);
-  tsig_log_dbg("    .rate    = %u,", station->iir.rate);
+  tsig_log_dbg("    .freq    = %" PRIu32 ",", station->iir.freq);
+  tsig_log_dbg("    .rate    = %" PRIu32 ",", station->iir.rate);
   tsig_log_dbg("    .phase   = %d,", station->iir.phase);
   tsig_log_dbg("    .a       = %f,", station->iir.a);
-  tsig_log_dbg("    .period  = %u,", station->iir.period);
+  tsig_log_dbg("    .period  = %" PRIu32 ",", station->iir.period);
   tsig_log_dbg("    .init_y0 = %f,", station->iir.init_y0);
   tsig_log_dbg("    .init_y1 = %f,", station->iir.init_y1);
-  tsig_log_dbg("    .sample  = %u,", station->iir.sample);
+  tsig_log_dbg("    .sample  = %" PRIu32 ",", station->iir.sample);
   tsig_log_dbg("    .y0      = %f,", station->iir.y0);
   tsig_log_dbg("    .y1      = %f,", station->iir.y1);
   tsig_log_dbg("  },");
-  tsig_log_dbg("  .freq           = %u,", station->freq);
+  tsig_log_dbg("  .freq           = %" PRIu32 ",", station->freq);
   tsig_log_dbg("  .gain           = %f,", station->gain);
   tsig_log_dbg("  .log            = %p,", station->log);
   tsig_log_dbg("};");
@@ -802,13 +803,17 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size) {
 
     char msg[TSIG_STATION_MESSAGE_SIZE];
 
-    sprintf(msg, "%04hu-%02hhu-%02hhu %02hhu:%02hhu:%02hhu.%03hu",
-            datetime.year, datetime.mon, datetime.day, datetime.hour,
-            datetime.min, datetime.sec, datetime.msec);
+    /* clang-format off */
+    sprintf(msg, /* "%04hu-%02hhu-%02hhu %02hhu:%02hhu:%02hhu.%03hu" */
+            "%04" PRIu16 "-%02" PRIu8 "-%02" PRIu8
+            " %02" PRIu8 ":%02" PRIu8 ":%02" PRIu8 ".%03" PRIu16,
+            datetime.year, datetime.mon, datetime.day,
+            datetime.hour, datetime.min, datetime.sec, datetime.msec);
+    /* clang-format on */
 
     if (expected && expected != station_first_run) {
       tsig_log_note("Resynced to %s UTC.", msg);
-      tsig_log_note("System clock was %lu ms %s than expected.", drift,
+      tsig_log_note("System clock was %" PRIu64 " ms %s than expected.", drift,
                     now < expected ? "less" : "more");
     } else {
       tsig_log("Synced to %s UTC.", msg);
@@ -836,9 +841,13 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size) {
       station->next_tick += station->samples_tick;
 
       if (station->tick == TSIG_STATION_TICKS_MIN - 1) {
-        tsig_log("Synced at %04hu-%02hhu-%02hhu %02hhu:%02hhu UTC.",
+        /* clang-format off */
+        tsig_log(/* "Synced at %04hu-%02hhu-%02hhu %02hhu:%02hhu UTC." */
+                 "Synced at %04" PRIu16 "-%02" PRIu8 "-%02" PRIu8
+                 " %02" PRIu8 ":%02" PRIu8 " UTC.",
                  tick_datetime.year, tick_datetime.mon, tick_datetime.day,
                  tick_datetime.hour, tick_datetime.min);
+        /* clang-format on */
 
         info->xmit_cb(station, tick_timestamp);
         station->tick = 0;
@@ -958,24 +967,32 @@ void tsig_station_init(tsig_station_t *station, tsig_cfg_t *cfg,
   tsig_datetime_t datetime = tsig_datetime_parse_timestamp(coeff * offset);
   int len;
 
+  /* clang-format off */
   len = sprintf(msg, "Starting %s", tsig_station_name(station_id));
   if (base >= 0) {
     tsig_datetime_t base_datetime = tsig_datetime_parse_timestamp(base);
-    len += sprintf(&msg[len], " from %04hu-%02hhu-%02hhu %02hhu:%02hhu:%02hhu",
+    len += sprintf(&msg[len],
+                   /* " from %04hu-%02hhu-%02hhu %02hhu:%02hhu:%02hhu" */
+                   " from %04" PRIu16 "-%02" PRIu8 "-%02" PRIu8
+                   " %02" PRIu8 ":%02" PRIu8 ":%02" PRIu8,
                    base_datetime.year, base_datetime.mon, base_datetime.day,
                    base_datetime.hour, base_datetime.min, base_datetime.sec);
   }
-  len += sprintf(&msg[len], " adjusted by %s%02hhu:%02hhu:%02hhu.%03hu", sign,
-                 datetime.hour, datetime.min, datetime.sec, datetime.msec);
+  len += sprintf(
+      &msg[len], /* " adjusted by %s%02hhu:%02hhu:%02hhu.%03hu" */
+      " adjusted by %s%02" PRIu8 ":%02" PRIu8 ":%02" PRIu8 ".%03" PRIu16,
+      sign, datetime.hour, datetime.min, datetime.sec, datetime.msec);
   if (station_id == TSIG_STATION_ID_MSF || station_id == TSIG_STATION_ID_WWVB)
-    len += sprintf(&msg[len], ", DUT1 %hd ms", dut1);
+    len += sprintf(&msg[len], ", DUT1 %" PRIi16 " ms", dut1);
 
   tsig_log("%s.", msg);
 
-  tsig_log_dbg("gain smoothing %s, ultrasound output %s", smooth ? "on" : "off",
-               ultrasound ? "allowed" : "not allowed");
-  tsig_log_dbg("generating %u Hz carrier (subharmonic %u of %u Hz)",
+  tsig_log_dbg("gain smoothing %s, ultrasound output %s",
+               smooth ? "on" : "off", ultrasound ? "allowed" : "not allowed");
+  tsig_log_dbg("generating %" PRIu32 " Hz carrier"
+               " (subharmonic %" PRIu32 " of %" PRIu32 " Hz)",
                freq / subharmonic, subharmonic, freq);
+  /* clang-format on */
 }
 
 /**

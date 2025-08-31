@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <limits.h>
 #include <signal.h>
 #include <string.h>
@@ -130,13 +131,13 @@ static int alsa_set_hw_params(tsig_alsa_t *alsa, tsig_cfg_t *cfg) {
   err = snd_pcm_hw_params_set_rate_near(pcm, params, &val, NULL);
   if (val != cfg->rate) {
     if (TSIG_AUDIO_RATE_44100 <= val && val <= TSIG_AUDIO_RATE_384000)
-      tsig_log_note("failed to set rate near %u, fallback to %u", cfg->rate,
-                    val);
+      tsig_log_note("failed to set rate near %" PRIu32 ", fallback to %u",
+                    cfg->rate, val);
     else
       err = -EINVAL;
   }
   if (err < 0) {
-    tsig_log_err("failed to set rate near %u: %s", cfg->rate,
+    tsig_log_err("failed to set rate near %" PRIu32 ": %s", cfg->rate,
                  snd_strerror(err));
     return err;
   }
@@ -145,10 +146,10 @@ static int alsa_set_hw_params(tsig_alsa_t *alsa, tsig_cfg_t *cfg) {
   val = cfg->channels;
   err = snd_pcm_hw_params_set_channels_near(pcm, params, &val);
   if (val != cfg->channels)
-    tsig_log_note("failed to set channels near %hu, fallback to %u",
+    tsig_log_note("failed to set channels near %" PRIu16 ", fallback to %u",
                   cfg->channels, val);
   if (err < 0) {
-    tsig_log_err("failed to set channels near %hu: %s", cfg->channels,
+    tsig_log_err("failed to set channels near %" PRIu16 ": %s", cfg->channels,
                  snd_strerror(err));
     return err;
   }

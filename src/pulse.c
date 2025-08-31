@@ -15,6 +15,7 @@
 #include "log.h"
 #include "mapping.h"
 
+#include <inttypes.h>
 #include <stdint.h>
 #include <signal.h>
 
@@ -101,14 +102,14 @@ static void pulse_print(tsig_pulse_t *pulse) {
   tsig_log_dbg("  .ctx          = %p,", pulse->ctx);
   tsig_log_dbg("  .state        = %d,", pulse->state);
   tsig_log_dbg("  .format       = %s,", format);
-  tsig_log_dbg("  .rate         = %u,", pulse->rate);
-  tsig_log_dbg("  .channels     = %u,", pulse->channels);
+  tsig_log_dbg("  .rate         = %" PRIu32 ",", pulse->rate);
+  tsig_log_dbg("  .channels     = %" PRIu8 ",", pulse->channels);
   tsig_log_dbg("  .cb           = %p,", pulse->cb);
   tsig_log_dbg("  .cb_data      = %p,", pulse->cb_data);
   tsig_log_dbg("  .cb_buf       = %p,", pulse->cb_buf);
   tsig_log_dbg("  .buf          = %p,", pulse->buf);
-  tsig_log_dbg("  .stride       = %u,", pulse->stride);
-  tsig_log_dbg("  .size         = %u,", pulse->size);
+  tsig_log_dbg("  .stride       = %" PRIu32 ",", pulse->stride);
+  tsig_log_dbg("  .size         = %" PRIu32 ",", pulse->size);
   tsig_log_dbg("  .audio_format = %s,", audio_format);
   tsig_log_dbg("  .timeout      = %u,", pulse->timeout);
   tsig_log_dbg("  .log          = %p,", log);
@@ -154,14 +155,14 @@ int tsig_pulse_init(tsig_pulse_t *pulse, tsig_cfg_t *cfg, tsig_log_t *log) {
 
   if (rate > PA_RATE_MAX) {
     rate = PA_RATE_MAX;
-    tsig_log_note("failed to set rate near %u, fallback to %u", cfg->rate,
-                  rate);
+    tsig_log_note("failed to set rate near %" PRIu32 ", fallback to %" PRIu32,
+                  cfg->rate, rate);
   }
 
   if (channels > PA_CHANNELS_MAX) {
     channels = PA_CHANNELS_MAX;
-    tsig_log_note("failed to set channels %hu, fallback to %hu", cfg->channels,
-                  channels);
+    tsig_log_note("failed to set channels %" PRIu16 ", fallback to %" PRIu16,
+                  cfg->channels, channels);
   }
 
   pulse->loop = pa_mainloop_new();
@@ -258,8 +259,10 @@ int tsig_pulse_init(tsig_pulse_t *pulse, tsig_cfg_t *cfg, tsig_log_t *log) {
   }
 
 #ifndef TSIG_DEBUG
-  tsig_log_dbg("started PulseAudio stream %s %u Hz %uch, buffer %lu",
-               pa_sample_format_to_string(format), rate, channels, buffer_size);
+  tsig_log_dbg(
+      "started PulseAudio stream %s"
+      " %" PRIu32 " Hz %" PRIu16 "ch, buffer %" PRIu32,
+      pa_sample_format_to_string(format), rate, channels, buffer_size);
 #else
   pulse_print(pulse);
 #endif /* TSIG_DEBUG */
