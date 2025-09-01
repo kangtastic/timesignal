@@ -9,9 +9,10 @@
 
 #pragma once
 
-#include <stdio.h>
-#include <stdbool.h>
 #include <syslog.h>
+
+#include <stdbool.h>
+#include <stdio.h>
 
 /** printf(3)-like syslog-compatible logging macros. */
 #ifdef TSIG_DEBUG

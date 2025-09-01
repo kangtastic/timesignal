@@ -15,14 +15,14 @@
 #include "log.h"
 #include "mapping.h"
 
-#include <dlfcn.h>
-#include <inttypes.h>
-#include <stdint.h>
-#include <signal.h>
+#include <pulse/pulseaudio.h>
 
+#include <dlfcn.h>
 #include <unistd.h>
 
-#include <pulse/pulseaudio.h>
+#include <inttypes.h>
+#include <signal.h>
+#include <stdint.h>
 
 /** PulseAudio library shared object name. */
 static const char *pulse_lib_soname = "libpulse.so.0";

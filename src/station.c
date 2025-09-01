@@ -14,12 +14,13 @@
 #include "log.h"
 #include "mapping.h"
 
-#include <stdio.h>
-#include <stdbool.h>
-#include <stdint.h>
+#include <syslog.h>
+
 #include <inttypes.h>
 #include <limits.h>
-#include <syslog.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
 
 /** Buffer size. */
 #define TSIG_STATION_MESSAGE_SIZE 128

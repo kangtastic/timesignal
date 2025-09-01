@@ -13,9 +13,9 @@
 
 #include <alsa/asoundlib.h>
 
-#include <stdint.h>
-#include <stdbool.h>
 #include <limits.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 typedef struct tsig_cfg tsig_cfg_t;
 typedef struct tsig_log tsig_log_t;

@@ -12,6 +12,10 @@
 #include "log.h"
 #include "station.h"
 
+#ifdef TSIG_HAVE_ALSA
+#include "alsa.h"
+#endif /* TSIG_HAVE_ALSA */
+
 #ifdef TSIG_HAVE_PIPEWIRE
 #include "pipewire.h"
 #endif /* TSIG_HAVE_PIPEWIRE */
@@ -19,10 +23,6 @@
 #ifdef TSIG_HAVE_PULSE
 #include "pulse.h"
 #endif /* TSIG_HAVE_PULSE */
-
-#ifdef TSIG_HAVE_ALSA
-#include "alsa.h"
-#endif /* TSIG_HAVE_ALSA */
 
 #include <stdbool.h>
 #include <stdint.h>

@@ -11,14 +11,15 @@
 
 #include "defaults.h"
 
-#include <stdio.h>
+#include <syslog.h>
+#include <unistd.h>
+
+#include <errno.h>
 #include <stdarg.h>
 #include <stdbool.h>
-#include <errno.h>
+#include <stdio.h>
 #include <string.h>
-#include <syslog.h>
 #include <time.h>
-#include <unistd.h>
 
 /** Timestamp buffer size. */
 #define TSIG_LOG_TIMESTAMP_SIZE 128

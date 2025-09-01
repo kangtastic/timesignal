@@ -16,18 +16,18 @@
 
 #include <alsa/asoundlib.h>
 
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdlib.h>
 #include <dlfcn.h>
+#include <poll.h>
+#include <unistd.h>
+
 #include <errno.h>
 #include <inttypes.h>
 #include <limits.h>
 #include <signal.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
-
-#include <poll.h>
-#include <unistd.h>
 
 /** ALSA library shared object name. */
 static const char *alsa_lib_soname = "libasound.so.2";

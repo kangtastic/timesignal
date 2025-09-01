@@ -15,14 +15,14 @@
 #include "log.h"
 #include "mapping.h"
 
-#include <dlfcn.h>
-#include <stdint.h>
-#include <signal.h>
+#include <pipewire/pipewire.h>
+#include <spa/param/audio/format-utils.h>
 
+#include <dlfcn.h>
 #include <unistd.h>
 
-#include <spa/param/audio/format-utils.h>
-#include <pipewire/pipewire.h>
+#include <signal.h>
+#include <stdint.h>
 
 /** PipeWire library shared object name. */
 static const char *pipewire_lib_soname = "libpipewire-0.3.so.0";

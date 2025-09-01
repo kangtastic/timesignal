@@ -9,8 +9,8 @@
 
 #pragma once
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 /**
  * Date and time. Presented in a friendlier manner than a raw timestamp.

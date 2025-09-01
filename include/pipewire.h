@@ -11,10 +11,10 @@
 
 #include "audio.h"
 
-#include <stdint.h>
-
-#include <spa/param/audio/raw.h>
 #include <pipewire/pipewire.h>
+#include <spa/param/audio/raw.h>
+
+#include <stdint.h>
 
 typedef struct tsig_cfg tsig_cfg_t;
 typedef struct tsig_log tsig_log_t;

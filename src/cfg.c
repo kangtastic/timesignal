@@ -17,17 +17,17 @@
 #include "station.h"
 #include "util.h"
 
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
+#include <getopt.h>
+
 #include <ctype.h>
 #include <errno.h>
 #include <inttypes.h>
 #include <limits.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-
-#include <getopt.h>
 
 /** Configurable audio backends. */
 #ifdef TSIG_HAVE_BACKENDS

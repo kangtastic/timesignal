@@ -11,9 +11,9 @@
 
 #include "audio.h"
 
-#include <stdint.h>
-
 #include <pulse/pulseaudio.h>
+
+#include <stdint.h>
 
 typedef struct tsig_cfg tsig_cfg_t;
 typedef struct tsig_log tsig_log_t;
