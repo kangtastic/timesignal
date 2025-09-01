@@ -131,10 +131,22 @@ static void pipewire_on_process(void *data) {
     return;
   }
 
-  /* We don't know the number of samples PipeWire wants ahead of time. */
+  /*
+   * We don't know the number of samples PipeWire wants ahead of time,
+   * and old versions can't even tell us in struct pw_buffer::requested.
+   * (PipeWire src/pipewire/stream.h wrongly claims it was added in 0.3.49.)
+   */
+
   size = spa_buf->datas[0].maxsize / pipewire->stride;
+
+#if PW_CHECK_VERSION(0, 3, 50)
   if (size > pw_buf->requested)
     size = pw_buf->requested;
+#endif
+
+  /* We must not generate more samples than can fit in pipewire->cb_buf. */
+  if (size > pipewire->size)
+    size = pipewire->size;
 
   /* Generate the requisite number of 1ch 64-bit float samples. */
   pipewire->cb(pipewire->cb_data, pipewire->cb_buf, size);
@@ -286,7 +298,6 @@ int tsig_pipewire_init(tsig_pipewire_t *pipewire, tsig_cfg_t *cfg,
       NULL
   );
   /* clang-format on */
-  pipewire_pw_properties_setf(props, PW_KEY_NODE_RATE, "1/%" PRIu32, cfg->rate);
   pipewire_pw_properties_setf(props, PW_KEY_NODE_LATENCY,
                               "%" PRIu32 "/%" PRIu32, buffer_size, cfg->rate);
   loop = pipewire_pw_main_loop_get_loop(pipewire->loop);

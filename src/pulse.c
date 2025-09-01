@@ -113,6 +113,10 @@ static void pulse_stream_write_cb(pa_stream *stream, size_t length,
   tsig_pulse_t *pulse = data;
   size_t size = length / pulse->stride;
 
+  /* We must not generate more samples than can fit in pulse->cb_buf. */
+  if (size > pulse->size)
+    size = pulse->size;
+
   /* Generate the requisite number of 1ch 64-bit float samples. */
   pulse->cb(pulse->cb_data, pulse->cb_buf, size);
 
