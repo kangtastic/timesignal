@@ -36,6 +36,8 @@ typedef struct tsig_alsa {
   tsig_log_t *log;                  /** Logging context. */
 } tsig_alsa_t;
 
+int tsig_alsa_lib_init(tsig_log_t *log);
 int tsig_alsa_init(tsig_alsa_t *alsa, tsig_cfg_t *cfg, tsig_log_t *log);
 int tsig_alsa_loop(tsig_alsa_t *alsa, tsig_audio_cb_t cb, void *cb_data);
 int tsig_alsa_deinit(tsig_alsa_t *alsa);
+int tsig_alsa_lib_deinit(tsig_log_t *log);

@@ -15,6 +15,7 @@
 #include "log.h"
 #include "mapping.h"
 
+#include <dlfcn.h>
 #include <stdint.h>
 #include <signal.h>
 
@@ -22,6 +23,29 @@
 
 #include <spa/param/audio/format-utils.h>
 #include <pipewire/pipewire.h>
+
+/** PipeWire library shared object name. */
+static const char *pipewire_lib_soname = "libpipewire-0.3.so.0";
+
+/** PipeWire library handle. */
+static void *pipewire_lib;
+
+/** Pointers to PipeWire library functions. */
+/* clang-format off */
+static void (*pipewire_pw_init)(int *argc, char ***argv);
+static void (*pipewire_pw_main_loop_destroy)(struct pw_main_loop *loop);
+static struct pw_loop *(*pipewire_pw_main_loop_get_loop)(struct pw_main_loop *loop);
+static struct pw_main_loop *(*pipewire_pw_main_loop_new)(const struct spa_dict *props);
+static int (*pipewire_pw_main_loop_quit)(struct pw_main_loop *loop);
+static int (*pipewire_pw_main_loop_run)(struct pw_main_loop *loop);
+static struct pw_properties *(*pipewire_pw_properties_new)(const char *key, ...);
+static int (*pipewire_pw_properties_setf)(struct pw_properties *properties, const char *key, const char *format, ...);
+static int (*pipewire_pw_stream_connect)(struct pw_stream *stream, enum spa_direction direction, uint32_t target_id, enum pw_stream_flags flags, const struct spa_pod **params, uint32_t n_params);
+static struct pw_buffer *(*pipewire_pw_stream_dequeue_buffer)(struct pw_stream *stream);
+static void (*pipewire_pw_stream_destroy)(struct pw_stream *stream);
+static struct pw_stream *(*pipewire_pw_stream_new_simple)(struct pw_loop *loop, const char *name, struct pw_properties *props, const struct pw_stream_events *events, void *data);
+static int (*pipewire_pw_stream_queue_buffer)(struct pw_stream *stream, struct pw_buffer *buffer);
+/* clang-format on */
 
 /** Default buffer time in us. */
 static const uint64_t pipewire_buffer_time = 200000;
@@ -82,7 +106,7 @@ static const char *pipewire_format_name(const enum spa_audio_format format) {
 static void pipewire_on_signal(void *data, int signal) {
   tsig_pipewire_t *pipewire = data;
   (void)signal; /* Suppress unused parameter warning. */
-  pw_main_loop_quit(pipewire->loop);
+  pipewire_pw_main_loop_quit(pipewire->loop);
 }
 
 /** PipeWire process event callback. */
@@ -94,7 +118,7 @@ static void pipewire_on_process(void *data) {
   uint64_t size;
   uint8_t *buf;
 
-  pw_buf = pw_stream_dequeue_buffer(pipewire->stream);
+  pw_buf = pipewire_pw_stream_dequeue_buffer(pipewire->stream);
   if (!pw_buf) {
     tsig_log_warn("failed to dequeue buffer during process event");
     return;
@@ -123,7 +147,7 @@ static void pipewire_on_process(void *data) {
   spa_buf->datas[0].chunk->stride = pipewire->stride;
   spa_buf->datas[0].chunk->size = size * pipewire->stride;
 
-  pw_stream_queue_buffer(pipewire->stream, pw_buf);
+  pipewire_pw_stream_queue_buffer(pipewire->stream, pw_buf);
 }
 
 /** Stream events. */
@@ -154,6 +178,48 @@ static void pipewire_print(tsig_pipewire_t *pipewire) {
   tsig_log_dbg("};");
 }
 #endif /* TSIG_DEBUG */
+
+/**
+ * Initialize PipeWire output.
+ *
+ * @param log Initialized logging context.
+ * @return 0 upon success, negative error code upon error.
+ */
+int tsig_pipewire_lib_init(tsig_log_t *log) {
+  pipewire_lib = dlopen(pipewire_lib_soname, RTLD_LAZY);
+  if (!pipewire_lib) {
+    tsig_log_err("failed to load PipeWire library: %s", dlerror());
+    return -EINVAL;
+  }
+
+#define pipewire_dlsym_assign(f)                                          \
+  do {                                                                    \
+    *(void **)(&pipewire_##f) = dlsym(pipewire_lib, #f);                  \
+    if (!pipewire_##f) {                                                  \
+      tsig_log_err("failed to load PipeWire library function %s: %s", #f, \
+                   dlerror());                                            \
+      return -EINVAL;                                                     \
+    }                                                                     \
+  } while (0)
+
+  pipewire_dlsym_assign(pw_init);
+  pipewire_dlsym_assign(pw_main_loop_destroy);
+  pipewire_dlsym_assign(pw_main_loop_get_loop);
+  pipewire_dlsym_assign(pw_main_loop_new);
+  pipewire_dlsym_assign(pw_main_loop_quit);
+  pipewire_dlsym_assign(pw_main_loop_run);
+  pipewire_dlsym_assign(pw_properties_new);
+  pipewire_dlsym_assign(pw_properties_setf);
+  pipewire_dlsym_assign(pw_stream_connect);
+  pipewire_dlsym_assign(pw_stream_dequeue_buffer);
+  pipewire_dlsym_assign(pw_stream_destroy);
+  pipewire_dlsym_assign(pw_stream_new_simple);
+  pipewire_dlsym_assign(pw_stream_queue_buffer);
+
+#undef pipewire_dlsym_assign
+
+  return 0;
+}
 
 /**
  * Initialize PipeWire output context.
@@ -204,30 +270,30 @@ int tsig_pipewire_init(tsig_pipewire_t *pipewire, tsig_cfg_t *cfg,
                   cfg->channels, channels);
   }
 
-  pw_init(NULL, NULL);
+  pipewire_pw_init(NULL, NULL);
 
-  pipewire->loop = pw_main_loop_new(NULL);
+  pipewire->loop = pipewire_pw_main_loop_new(NULL);
   if (!pipewire->loop) {
     tsig_log_err("failed to create PipeWire main loop");
     return err;
   }
 
   /* clang-format off */
-  props = pw_properties_new(
+  props = pipewire_pw_properties_new(
       PW_KEY_MEDIA_TYPE, "Audio",
       PW_KEY_MEDIA_CATEGORY, "Playback",
       PW_KEY_MEDIA_ROLE, "Music",
       NULL
   );
   /* clang-format on */
-  pw_properties_setf(props, PW_KEY_NODE_RATE, "1/%" PRIu32, cfg->rate);
-  pw_properties_setf(props, PW_KEY_NODE_LATENCY, "%" PRIu32 "/%" PRIu32,
-                     buffer_size, cfg->rate);
-  loop = pw_main_loop_get_loop(pipewire->loop);
+  pipewire_pw_properties_setf(props, PW_KEY_NODE_RATE, "1/%" PRIu32, cfg->rate);
+  pipewire_pw_properties_setf(props, PW_KEY_NODE_LATENCY,
+                              "%" PRIu32 "/%" PRIu32, buffer_size, cfg->rate);
+  loop = pipewire_pw_main_loop_get_loop(pipewire->loop);
 
   pipewire->stream =
-      pw_stream_new_simple(loop, TSIG_DEFAULTS_NAME "-pipewire", props,
-                           &pipewire_stream_events, (void *)pipewire);
+      pipewire_pw_stream_new_simple(loop, TSIG_DEFAULTS_NAME "-pipewire", props,
+                                    &pipewire_stream_events, (void *)pipewire);
   if (!pipewire->stream) {
     tsig_log_err("failed to create PipeWire stream");
     goto out_deinit;
@@ -240,7 +306,7 @@ int tsig_pipewire_init(tsig_pipewire_t *pipewire, tsig_cfg_t *cfg,
                                .rate = cfg->rate));
 
   /* NOTE: We don't pass PW_STREAM_FLAG_RT_PROCESS as we don't need it. */
-  err = pw_stream_connect(
+  err = pipewire_pw_stream_connect(
       pipewire->stream, PW_DIRECTION_OUTPUT, PW_ID_ANY,
       PW_STREAM_FLAG_AUTOCONNECT | PW_STREAM_FLAG_MAP_BUFFERS, params, 1);
   if (err < 0) {
@@ -299,7 +365,7 @@ out_deinit:
  */
 int tsig_pipewire_loop(tsig_pipewire_t *pipewire, tsig_audio_cb_t cb,
                        void *cb_data) {
-  struct pw_loop *loop = pw_main_loop_get_loop(pipewire->loop);
+  struct pw_loop *loop = pipewire_pw_main_loop_get_loop(pipewire->loop);
   int err;
 
   /* Install PipeWire signal handler. */
@@ -311,7 +377,7 @@ int tsig_pipewire_loop(tsig_pipewire_t *pipewire, tsig_audio_cb_t cb,
   pipewire->cb_data = cb_data;
 
   alarm(pipewire->timeout);
-  err = pw_main_loop_run(pipewire->loop);
+  err = pipewire_pw_main_loop_run(pipewire->loop);
   alarm(0);
 
   return err;
@@ -325,12 +391,27 @@ int tsig_pipewire_loop(tsig_pipewire_t *pipewire, tsig_audio_cb_t cb,
  */
 int tsig_pipewire_deinit(tsig_pipewire_t *pipewire) {
   if (pipewire->stream)
-    pw_stream_destroy(pipewire->stream);
+    pipewire_pw_stream_destroy(pipewire->stream);
 
   if (pipewire->loop)
-    pw_main_loop_destroy(pipewire->loop);
+    pipewire_pw_main_loop_destroy(pipewire->loop);
 
   free(pipewire->cb_buf);
 
   return 0;
+}
+
+/**
+ * Deinitialize PipeWire output.
+ *
+ * @param log Initialized logging context.
+ * @return 0 upon success, negative error code upon error.
+ */
+int tsig_pipewire_lib_deinit(tsig_log_t *log) {
+  if (!dlclose(pipewire_lib))
+    return 0;
+
+  tsig_log_err("failed to unload PipeWire library: %s", dlerror());
+
+  return -EINVAL;
 }

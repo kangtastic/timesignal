@@ -45,25 +45,18 @@ static tsig_station_t timesignal_station;
 static tsig_cfg_t timesignal_cfg;
 static tsig_log_t timesignal_log;
 
-/** Audio backend information. */
-typedef struct timesignal_backend_info {
-  tsig_backend_t backend;
-  void *data;
-  tsig_backend_init_t init;
-  tsig_backend_loop_t loop;
-  tsig_backend_deinit_t deinit;
-} timesignal_backend_t;
-
 /** Audio backends. */
-static timesignal_backend_t timesignal_backends[] = {
+static tsig_backend_info_t timesignal_backends[] = {
 #ifdef TSIG_HAVE_PIPEWIRE
     [TSIG_BACKEND_PIPEWIRE] =
         {
             .backend = TSIG_BACKEND_PIPEWIRE,
             .data = &timesignal_pipewire,
+            .lib_init = (tsig_backend_lib_init_t)&tsig_pipewire_lib_init,
             .init = (tsig_backend_init_t)&tsig_pipewire_init,
             .loop = (tsig_backend_loop_t)&tsig_pipewire_loop,
             .deinit = (tsig_backend_deinit_t)&tsig_pipewire_deinit,
+            .lib_deinit = (tsig_backend_lib_deinit_t)&tsig_pipewire_lib_deinit,
         },
 #endif /* TSIG_HAVE_PIPEWIRE */
 
@@ -72,9 +65,11 @@ static timesignal_backend_t timesignal_backends[] = {
         {
             .backend = TSIG_BACKEND_PULSE,
             .data = &timesignal_pulse,
+            .lib_init = (tsig_backend_lib_init_t)&tsig_pulse_lib_init,
             .init = (tsig_backend_init_t)&tsig_pulse_init,
             .loop = (tsig_backend_loop_t)&tsig_pulse_loop,
             .deinit = (tsig_backend_deinit_t)&tsig_pulse_deinit,
+            .lib_deinit = (tsig_backend_lib_deinit_t)&tsig_pulse_lib_deinit,
         },
 #endif /* TSIG_HAVE_PULSE */
 
@@ -83,19 +78,23 @@ static timesignal_backend_t timesignal_backends[] = {
         {
             .backend = TSIG_BACKEND_ALSA,
             .data = &timesignal_alsa,
+            .lib_init = (tsig_backend_lib_init_t)&tsig_alsa_lib_init,
             .init = (tsig_backend_init_t)&tsig_alsa_init,
             .loop = (tsig_backend_loop_t)&tsig_alsa_loop,
             .deinit = (tsig_backend_deinit_t)&tsig_alsa_deinit,
+            .lib_deinit = (tsig_backend_lib_deinit_t)&tsig_alsa_lib_deinit,
         },
 #endif /* TSIG_HAVE_ALSA */
+
+    {.backend = TSIG_BACKEND_UNKNOWN},
 };
 
 int main(int argc, char *argv[]) {
-  int backends = sizeof(timesignal_backends) / sizeof(timesignal_backends[0]);
+  tsig_backend_info_t *backend = timesignal_backends;
   tsig_station_t *station = &timesignal_station;
   tsig_cfg_t *cfg = &timesignal_cfg;
   tsig_log_t *log = &timesignal_log;
-  timesignal_backend_t *backend;
+
   bool is_done = false;
   const char *name;
   int err;
@@ -112,20 +111,23 @@ int main(int argc, char *argv[]) {
 
 #ifdef TSIG_HAVE_BACKENDS
   if (cfg->backend != TSIG_BACKEND_UNKNOWN) {
-    timesignal_backends[0] = timesignal_backends[cfg->backend];
-    backends = 1;
+    backend[0] = timesignal_backends[cfg->backend];
+    backend[1].backend = TSIG_BACKEND_UNKNOWN;
   }
 #endif /* TSIG_HAVE_BACKENDS */
 
-  for (int i = 0; i < backends; i++) {
-    backend = &timesignal_backends[i];
+  for (; !is_done && backend->backend != TSIG_BACKEND_UNKNOWN; backend++) {
     name = tsig_backend_name(backend->backend);
 
     tsig_log("Trying %s backend.", name);
 
-    err = backend->init(backend->data, cfg, log);
+    err = backend->lib_init(log);
     if (err < 0)
       continue;
+
+    err = backend->init(backend->data, cfg, log);
+    if (err < 0)
+      goto loop_backend_lib_deinit;
 
 #ifdef TSIG_HAVE_PULSE
     /* PulseAudio may not support the configured rate. */
@@ -143,11 +145,13 @@ int main(int argc, char *argv[]) {
     if (err < 0)
       tsig_log_err("failed to cleanly exit output loop");
 
-    backend->deinit(backend->data);
-
+    /* TODO: Improve error handling logic. */
     is_done = true;
 
-    break;
+    backend->deinit(backend->data);
+
+  loop_backend_lib_deinit:
+    backend->lib_deinit(log);
   }
 
   if (!is_done) {

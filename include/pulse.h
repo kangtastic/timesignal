@@ -40,6 +40,8 @@ typedef struct tsig_pulse {
   tsig_log_t *log;                  /** Logging context. */
 } tsig_pulse_t;
 
+int tsig_pulse_lib_init(tsig_log_t *log);
 int tsig_pulse_init(tsig_pulse_t *pulse, tsig_cfg_t *cfg, tsig_log_t *log);
 int tsig_pulse_loop(tsig_pulse_t *pulse, tsig_audio_cb_t cb, void *cb_data);
 int tsig_pulse_deinit(tsig_pulse_t *pulse);
+int tsig_pulse_lib_deinit(tsig_log_t *log);

@@ -43,19 +43,19 @@ INCDIR            := include
 
 CC                := gcc
 
-CFLAGS            ?= -O2 -Wall -Wextra -std=gnu11
+CFLAGS            ?= -O2 -fstack-protector-strong -Wall -Wextra -Wformat -Werror=format-security -fPIE -std=gnu11
 CFLAGS            += -I$(INCDIR)
 CFLAGS_EXTRA      :=
 
-LDFLAGS           ?=
-LIBS              :=
+LDFLAGS           ?= -pie -Wl,-z,relro -Wl,-z,now
+LIBS              := -ldl
 
 SRC               := $(wildcard $(SRCDIR)/*.c)
 OBJ               := $(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(SRC))
 
 ifeq (yes,$(HAVE_PIPEWIRE))
 CFLAGS_EXTRA      += $(shell $(PKG_CONFIG) --cflags libpipewire-0.3) -DTSIG_HAVE_PIPEWIRE
-LIBS              += $(shell $(PKG_CONFIG) --libs libpipewire-0.3)
+LIBS              += $(shell $(PKG_CONFIG) --libs-only-L --libs-only-other libpipewire-0.3)
 else
 SRC               := $(filter-out $(SRCDIR)/pipewire.c,$(SRC))
 OBJ               := $(filter-out $(BUILDDIR)/pipewire.o,$(OBJ))
@@ -63,7 +63,7 @@ endif
 
 ifeq (yes,$(HAVE_PULSE))
 CFLAGS_EXTRA      += $(shell $(PKG_CONFIG) --cflags libpulse) -DTSIG_HAVE_PULSE
-LIBS              += $(shell $(PKG_CONFIG) --libs libpulse)
+LIBS              += $(shell $(PKG_CONFIG) --libs-only-L --libs-only-other libpulse)
 else
 SRC               := $(filter-out $(SRCDIR)/pulse.c,$(SRC))
 OBJ               := $(filter-out $(BUILDDIR)/pulse.o,$(OBJ))
@@ -71,7 +71,7 @@ endif
 
 ifeq (yes,$(HAVE_ALSA))
 CFLAGS_EXTRA      += -DTSIG_HAVE_ALSA
-LIBS              += $(shell $(PKG_CONFIG) --libs alsa)
+LIBS              += $(shell $(PKG_CONFIG) --libs-only-L --libs-only-other alsa)
 else
 SRC               := $(filter-out $(SRCDIR)/alsa.c,$(SRC))
 OBJ               := $(filter-out $(BUILDDIR)/alsa.o,$(OBJ))
