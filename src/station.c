@@ -680,6 +680,46 @@ void station_xmit_level_print(tsig_log_t *log, uint8_t xmit_level[]) {
   }
 }
 
+/** Print station information. */
+static void station_init_print(tsig_log_t *log, tsig_station_id_t station_id,
+                               int64_t base, int32_t offset, int16_t dut1,
+                               bool smooth, bool ultrasound, uint32_t freq,
+                               uint32_t subharmonic) {
+  const char *sign = offset < 0 ? "-" : "";
+  int32_t coeff = offset < 0 ? -1 : 1;
+  char msg[TSIG_STATION_MESSAGE_SIZE];
+  tsig_datetime_t base_datetime;
+  tsig_datetime_t datetime;
+  int len;
+
+  datetime = tsig_datetime_parse_timestamp(coeff * offset);
+
+  /* clang-format off */
+  len = sprintf(msg, "Starting %s", tsig_station_name(station_id));
+  if (base >= 0) {
+    base_datetime = tsig_datetime_parse_timestamp(base);
+    len += sprintf(&msg[len], /* " from %04hu-%02hhu-%02hhu %02hhu:%02hhu:%02hhu" */
+                   " from %04" PRIu16 "-%02" PRIu8 "-%02" PRIu8
+                   " %02" PRIu8 ":%02" PRIu8 ":%02" PRIu8,
+                   base_datetime.year, base_datetime.mon, base_datetime.day,
+                   base_datetime.hour, base_datetime.min, base_datetime.sec);
+  }
+  len += sprintf(&msg[len], /* " adjusted by %s%02hhu:%02hhu:%02hhu.%03hu" */
+                 " adjusted by %s%02" PRIu8 ":%02" PRIu8 ":%02" PRIu8 ".%03" PRIu16,
+                 sign, datetime.hour, datetime.min, datetime.sec, datetime.msec);
+  if (station_id == TSIG_STATION_ID_MSF || station_id == TSIG_STATION_ID_WWVB)
+    len += sprintf(&msg[len], ", DUT1 %" PRIi16 " ms", dut1);
+  tsig_log("%s.", msg);
+
+  tsig_log_dbg("Gain smoothing %s, ultrasound output %sallowed.",
+               smooth ? "on" : "off", ultrasound ? "" : "not ");
+
+  tsig_log_dbg("Generating %" PRIu32 " Hz carrier"
+               " (subharmonic %" PRIu32 " of %" PRIu32 " Hz).",
+               freq / subharmonic, subharmonic, freq);
+  /* clang-format on */
+}
+
 #ifdef TSIG_DEBUG
 /** Print initialized station context. */
 void station_print(tsig_station_t *station) {
@@ -913,6 +953,8 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size) {
  */
 void tsig_station_init(tsig_station_t *station, tsig_cfg_t *cfg,
                        tsig_log_t *log) {
+  uint32_t freq = station_info[cfg->station].freq;
+  uint32_t limit = station_ultrasound_threshold;
   tsig_station_id_t station_id = cfg->station;
   bool ultrasound = cfg->ultrasound;
   int32_t offset = cfg->offset;
@@ -920,19 +962,7 @@ void tsig_station_init(tsig_station_t *station, tsig_cfg_t *cfg,
   bool smooth = cfg->smooth;
   int64_t base = cfg->base;
   int16_t dut1 = cfg->dut1;
-
-  *station = (tsig_station_t){
-      .station = station_id,
-      .base = base,
-      .offset = offset,
-      .dut1 = dut1,
-      .smooth = smooth,
-      .rate = rate,
-      .xmit_level = {0},
-      .next_timestamp = station_first_run,
-      .samples_tick = rate * TSIG_STATION_MSECS_TICK / 1000,
-      .log = log,
-  };
+  uint32_t subharmonic = 1;
 
   /*
    * The first odd-numbered subharmonic of the station frequency that falls
@@ -952,47 +982,28 @@ void tsig_station_init(tsig_station_t *station, tsig_cfg_t *cfg,
    * it would be rather unlikely), so we will do so only if the user allows it.
    */
 
-  uint32_t limit = ultrasound ? rate / 2 : station_ultrasound_threshold;
-  uint32_t freq = station_info[station_id].freq;
-  uint32_t subharmonic = 1;
+  if (cfg->ultrasound)
+    limit = cfg->rate / 2;
 
   while (freq / subharmonic > limit)
     subharmonic += 2;
 
-  station->freq = freq / subharmonic;
+  *station = (tsig_station_t){
+      .station = station_id,
+      .base = base,
+      .offset = offset,
+      .dut1 = dut1,
+      .smooth = smooth,
+      .rate = rate,
+      .xmit_level = {0},
+      .next_timestamp = station_first_run,
+      .samples_tick = rate * TSIG_STATION_MSECS_TICK / 1000,
+      .freq = freq / subharmonic,
+      .log = log,
+  };
 
-  char msg[TSIG_STATION_MESSAGE_SIZE];
-  const char *sign = offset < 0 ? "-" : "";
-  int32_t coeff = offset < 0 ? -1 : 1;
-  tsig_datetime_t datetime = tsig_datetime_parse_timestamp(coeff * offset);
-  int len;
-
-  /* clang-format off */
-  len = sprintf(msg, "Starting %s", tsig_station_name(station_id));
-  if (base >= 0) {
-    tsig_datetime_t base_datetime = tsig_datetime_parse_timestamp(base);
-    len += sprintf(&msg[len],
-                   /* " from %04hu-%02hhu-%02hhu %02hhu:%02hhu:%02hhu" */
-                   " from %04" PRIu16 "-%02" PRIu8 "-%02" PRIu8
-                   " %02" PRIu8 ":%02" PRIu8 ":%02" PRIu8,
-                   base_datetime.year, base_datetime.mon, base_datetime.day,
-                   base_datetime.hour, base_datetime.min, base_datetime.sec);
-  }
-  len += sprintf(
-      &msg[len], /* " adjusted by %s%02hhu:%02hhu:%02hhu.%03hu" */
-      " adjusted by %s%02" PRIu8 ":%02" PRIu8 ":%02" PRIu8 ".%03" PRIu16,
-      sign, datetime.hour, datetime.min, datetime.sec, datetime.msec);
-  if (station_id == TSIG_STATION_ID_MSF || station_id == TSIG_STATION_ID_WWVB)
-    len += sprintf(&msg[len], ", DUT1 %" PRIi16 " ms", dut1);
-
-  tsig_log("%s.", msg);
-
-  tsig_log_dbg("Gain smoothing %s, ultrasound output %s.",
-               smooth ? "on" : "off", ultrasound ? "allowed" : "not allowed");
-  tsig_log_dbg("Generating %" PRIu32 " Hz carrier"
-               " (subharmonic %" PRIu32 " of %" PRIu32 " Hz).",
-               freq / subharmonic, subharmonic, freq);
-  /* clang-format on */
+  station_init_print(log, station_id, base, offset, dut1, smooth, ultrasound,
+                     freq, subharmonic);
 }
 
 /**
