@@ -35,6 +35,21 @@
 #define tsig_log(...)      tsig_log_with_level(LOG_INFO, __VA_ARGS__)
 #define tsig_log_dbg(...)  tsig_log_with_level(LOG_DEBUG, __VA_ARGS__)
 
+/** printf(3)-like logging macro for TTY only. */
+#ifdef TSIG_DEBUG
+#define tsig_log_tty(...)                                     \
+  do {                                                        \
+    if (log->level >= LOG_INFO && log->console)               \
+      tsig_log_msg_tty(log, __FILE__, __LINE__, __VA_ARGS__); \
+  } while (0)
+#else
+#define tsig_log_tty(...)                          \
+  do {                                             \
+    if (log->level >= LOG_INFO && log->console)    \
+      tsig_log_msg_tty(log, NULL, 0, __VA_ARGS__); \
+  } while (0)
+#endif /* TSIG_DEBUG */
+
 /** Logging context. */
 typedef struct tsig_log {
   int level;          /** Maximum log level. */
@@ -47,7 +62,9 @@ typedef struct tsig_log {
 
 void tsig_log_init(tsig_log_t *log);
 void tsig_log_finish_init(tsig_log_t *log, char log_file[], bool syslog,
-                          int verbosity);
+                          bool verbose);
 void tsig_log_msg(tsig_log_t *log, int level, const char *src_file,
                   int src_line, const char *fmt, ...);
+void tsig_log_msg_tty(tsig_log_t *log, const char *src_file, int src_line,
+                      const char *fmt, ...);
 void tsig_log_deinit(tsig_log_t *log);

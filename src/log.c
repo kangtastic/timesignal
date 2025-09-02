@@ -27,7 +27,7 @@
 /** Minimum __FILE__:__LINE__ marker width. */
 #define TSIG_LOG_SRC_INFO_MIN_WIDTH 10
 
-/** Log level descriptions for log file/syslog output.  */
+/** Log level descriptions for non-TTY/log file/syslog output.  */
 static const char *log_descs[] = {
     NULL,        /* LOG_EMERG, unused */
     NULL,        /* LOG_ALERT, unused */
@@ -39,8 +39,8 @@ static const char *log_descs[] = {
     "debug: ",   /* LOG_DEBUG */
 };
 
-/** Colorized log level descriptions for console (stdout/stderr) output.  */
-static const char *log_descs_colorized[] = {
+/** Colorized log level descriptions for TTY output.  */
+static const char *log_descs_tty[] = {
     NULL,                         /* LOG_EMERG, unused */
     NULL,                         /* LOG_ALERT, unused */
     NULL,                         /* LOG_CRIT, unused */
@@ -48,12 +48,12 @@ static const char *log_descs_colorized[] = {
     "\x1b[1;95mwarning:\x1b[0m ", /* LOG_WARNING, bold, light magenta */
     "\x1b[1;94mnotice:\x1b[0m ",  /* LOG_NOTICE, bold, light blue */
     "",                           /* LOG_INFO, left blank */
-    "debug: ",                    /* LOG_DEBUG, left uncolorized */
+    "",                           /* LOG_DEBUG, left blank */
 };
 
 /** Default logging context. */
 static tsig_log_t log_default = {
-    .level = LOG_NOTICE,
+    .level = LOG_INFO,
     .console = true,
     .log_file = NULL,
     .syslog = false,
@@ -73,27 +73,39 @@ static void log_write_timestamp(FILE *file) {
   fprintf(file, "%s.%.03ld | ", timestamp, ts.tv_nsec / 1000000);
 }
 
-/** Write source file and line information to a file. */
-static void log_write_src_info(FILE *file, const char *src_file, int src_line) {
+/** Write a message to a file, possibly prefixed with source file and line. */
+static void log_write_msg(FILE *file, const char *src_file, int src_line,
+                          const char *desc, const char *fmt, va_list params) {
   int src_info = TSIG_LOG_SRC_INFO_MIN_WIDTH;
 
-  if (!src_file || !src_line)
-    return;
+  if (src_file && src_line) {
+    src_info -= fprintf(file, "%s:%d", src_file, src_line);
+    if (src_info > 0)
+      fprintf(file, "%*s", src_info, "");
+    fprintf(file, " | ");
+  }
 
-  src_info -= fprintf(file, "%s:%d", src_file, src_line);
-  if (src_info > 0)
-    fprintf(file, "%*s", src_info, "");
-
-  fprintf(file, " | ");
-}
-
-/** Write a message to a file. */
-static void log_write_msg(FILE *file, const char *desc, const char *fmt,
-                          va_list params) {
   fprintf(file, "%s", desc);
   vfprintf(file, fmt, params);
   fprintf(file, "%s", "\n");
+
   fflush(file);
+}
+
+/** Log a message to console (stdout/stderr) or TTY. */
+static void log_msg_console(tsig_log_t *log, int level, const char *src_file,
+                            int src_line, const char *fmt, va_list params) {
+  const char *desc;
+  bool have_tty;
+  FILE *file;
+
+  /* Colorize description when logging to a TTY. */
+  file = level > LOG_WARNING ? stdout : stderr;
+  have_tty = (file == stdout && log->is_stdout_tty) ||
+             (file == stderr && log->is_stderr_tty);
+  desc = have_tty ? log_descs_tty[level] : log_descs[level];
+
+  log_write_msg(file, src_file, src_line, desc, fmt, params);
 }
 
 #ifdef TSIG_DEBUG
@@ -128,13 +140,13 @@ void tsig_log_init(tsig_log_t *log) {
  * @param log Initialized logging context.
  * @param log_file Log file. Will emit logs to it if not NULL.
  * @param syslog Whether to emit logs to syslog.
- * @param verbosity Verbosity level.
+ * @param verbose Whether to emit verbose logs.
  */
 void tsig_log_finish_init(tsig_log_t *log, char log_file[], bool syslog,
-                          int verbosity) {
-  log->level = verbosity == 2   ? LOG_DEBUG
-               : verbosity == 1 ? LOG_INFO
-                                : LOG_NOTICE;
+                          bool verbose) {
+  if (verbose)
+    log->level = LOG_DEBUG;
+
   if (syslog) {
     openlog(TSIG_DEFAULTS_NAME, LOG_PID, LOG_USER);
     log->syslog = true;
@@ -170,42 +182,54 @@ __attribute__((format(printf, 5, 6))) void tsig_log_msg(tsig_log_t *log,
                                                         const char *src_file,
                                                         int src_line,
                                                         const char *fmt, ...) {
-  const char *desc;
   va_list cparams;
   va_list fparams;
   va_list sparams;
   va_list params;
-  FILE *file;
 
   va_start(params, fmt);
 
   if (log->console) {
-    /* Colorize description when logging to a TTY. */
-    file = level > LOG_WARNING ? stdout : stderr;
-    desc = ((file == stdout && log->is_stdout_tty) ||
-            (file == stderr && log->is_stderr_tty))
-               ? log_descs_colorized[level]
-               : log_descs[level];
     va_copy(cparams, params);
-    log_write_src_info(file, src_file, src_line);
-    log_write_msg(file, desc, fmt, cparams);
+    log_msg_console(log, level, src_file, src_line, fmt, cparams);
     va_end(cparams);
   }
 
   if (log->log_file) {
     va_copy(fparams, params);
     log_write_timestamp(log->log_file);
-    log_write_src_info(log->log_file, src_file, src_line);
-    log_write_msg(log->log_file, log_descs[level], fmt, fparams);
+    log_write_msg(log->log_file, src_file, src_line, log_descs[level], fmt,
+                  fparams);
     va_end(fparams);
   }
 
   if (log->syslog) {
     va_copy(sparams, params);
-    vsyslog(level, fmt, params);
+    vsyslog(level, fmt, sparams);
     va_end(sparams);
   }
 
+  va_end(params);
+}
+
+/**
+ * Log a message to a TTY only.
+ *
+ * @param log Initialized logging context.
+ * @param src_file Source file name, ordinarily NULL.
+ * @param src_line Source line number, ordinarily 0.
+ * @param fmt Format string.
+ */
+__attribute__((format(printf, 4, 5))) void tsig_log_msg_tty(
+    tsig_log_t *log, const char *src_file, int src_line, const char *fmt, ...) {
+  va_list params;
+
+  /* Log level is always LOG_INFO, output file is always stdout. */
+  if (!log->is_stdout_tty)
+    return;
+
+  va_start(params, fmt);
+  log_msg_console(log, LOG_INFO, src_file, src_line, fmt, params);
   va_end(params);
 }
 

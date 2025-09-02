@@ -75,8 +75,7 @@ static bool cfg_set_ultrasound(tsig_cfg_t *cfg, tsig_log_t *log,
                                const char *str);
 static bool cfg_set_log_file(tsig_cfg_t *cfg, tsig_log_t *log, const char *str);
 static bool cfg_set_syslog(tsig_cfg_t *cfg, tsig_log_t *log, const char *str);
-static bool cfg_set_verbosity(tsig_cfg_t *cfg, tsig_log_t *log,
-                              const char *str);
+static bool cfg_set_verbose(tsig_cfg_t *cfg, tsig_log_t *log, const char *str);
 
 #ifdef TSIG_DEBUG
 static void cfg_print(tsig_cfg_t *cfg, tsig_log_t *log);
@@ -141,7 +140,7 @@ static const char cfg_help_fmt[] = {
     "\n"
     "Miscellaneous:\n"
     "  -h, --help               show this help and exit\n"
-    "  -v, --verbose            increase verbosity level\n"
+    "  -v, --verbose            increase verbosity\n"
     "\n"
     "Recognized option values (not all work on all systems):\n"
     "  time station   BPC, DCF77, JJY, JJY60, MSF, WWVB\n"
@@ -171,7 +170,7 @@ static const char cfg_help_fmt[] = {
     "  config file    filesystem path\n"
     "  log file       filesystem path\n"
     "  syslog         provide to turn on\n"
-    "  verbosity      provide to increase (maximum twice)\n"
+    "  verbose        provide to turn on\n"
     "\n"
     "Default option values:\n"
     "  time station   WWVB\n"
@@ -196,7 +195,7 @@ static const char cfg_help_fmt[] = {
     "  config file    none\n"
     "  log file       none\n"
     "  syslog         off\n"
-    "  verbosity      0\n"
+    "  verbose        off\n"
     "\n"
     /* clang-format on */
 };
@@ -224,7 +223,7 @@ static tsig_cfg_t cfg_default = {
     .ultrasound = false,
     .log_file = {""},
     .syslog = false,
-    .verbosity = 0,
+    .verbose = false,
 };
 
 /** Long options. */
@@ -294,7 +293,7 @@ static cfg_setter_info_t cfg_setter_info[] = {
     {"ultrasound", &cfg_set_ultrasound},
     {"log", &cfg_set_log_file},
     {"syslog", &cfg_set_syslog},
-    {"verbose", &cfg_set_verbosity},
+    {"verbose", &cfg_set_verbose},
     {NULL, NULL},
 };
 
@@ -735,17 +734,17 @@ static bool cfg_set_syslog(tsig_cfg_t *cfg, tsig_log_t *log, const char *str) {
   return true;
 }
 
-/** Setter for verbosity. */
-static bool cfg_set_verbosity(tsig_cfg_t *cfg, tsig_log_t *log,
-                              const char *str) {
-  long verbosity;
-
-  if (!cfg_strtol(str, &verbosity) || !(0 <= verbosity && verbosity <= 2)) {
-    tsig_log_err("Invalid verbosity \"%s\" must be between 0 and 2", str);
+/** Setter for verbose. */
+static bool cfg_set_verbose(tsig_cfg_t *cfg, tsig_log_t *log, const char *str) {
+  if (!str || !tsig_util_strcasecmp(str, "on")) {
+    cfg->verbose = true;
+  } else if (!tsig_util_strcasecmp(str, "off")) {
+    cfg->verbose = false;
+  } else {
+    tsig_log_err("Invalid verbose \"%s\" must be \"on\" or \"off\"", str);
     return false;
   }
 
-  cfg->verbosity = verbosity;
   return true;
 }
 
@@ -968,7 +967,7 @@ static void cfg_print(tsig_cfg_t *cfg, tsig_log_t *log) {
   tsig_log_dbg("  .ultrasound = %d,", cfg->ultrasound);
   tsig_log_dbg("  .log_file   = \"%s\",", cfg->log_file);
   tsig_log_dbg("  .syslog     = %d,", cfg->syslog);
-  tsig_log_dbg("  .verbosity  = %d,", cfg->verbosity);
+  tsig_log_dbg("  .verbose    = %d,", cfg->verbose);
   tsig_log_dbg("};");
 }
 #endif /* TSIG_DEBUG */
@@ -1012,7 +1011,7 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
   bool got_ultrasound = false;
   bool got_log_file = false;
   bool got_syslog = false;
-  bool got_verbosity = false;
+  bool got_verbose = false;
 
   *cfg = cfg_default;
 
@@ -1093,9 +1092,8 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
         help = true;
         break;
       case 'v':
-        if (cfg->verbosity < 2)
-          cfg->verbosity++;
-        got_verbosity = true;
+        cfg->verbose = true;
+        got_verbose = true;
         break;
       default:
         is_ok = false;
@@ -1143,13 +1141,13 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
     strcpy(cfg->log_file, cfg_file.log_file);
   if (!got_syslog)
     cfg->syslog = cfg_file.syslog;
-  if (!got_verbosity)
-    cfg->verbosity = cfg_file.verbosity;
+  if (!got_verbose)
+    cfg->verbose = cfg_file.verbose;
 
   if (help || !is_ok)
     tsig_cfg_help();
   else
-    tsig_log_finish_init(log, cfg->log_file, cfg->syslog, cfg->verbosity);
+    tsig_log_finish_init(log, cfg->log_file, cfg->syslog, cfg->verbose);
 
 #ifdef TSIG_DEBUG
   cfg_print(&cfg_file, log);

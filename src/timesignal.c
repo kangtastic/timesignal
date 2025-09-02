@@ -9,6 +9,7 @@
 
 #include "backend.h"
 #include "cfg.h"
+#include "defaults.h"
 #include "log.h"
 #include "station.h"
 
@@ -26,7 +27,11 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
+
+/** Buffer size. */
+#define TSIG_TIMESIGNAL_MSG_SIZE 128
 
 /* Module globals. */
 #ifdef TSIG_HAVE_PIPEWIRE
@@ -89,14 +94,32 @@ static tsig_backend_info_t timesignal_backends[] = {
     {.backend = TSIG_BACKEND_UNKNOWN},
 };
 
+/** Determine which audio backends are available. */
+static void timesignal_find_backend_order(tsig_cfg_t *cfg, tsig_log_t *log) {
+  tsig_backend_info_t *backend = timesignal_backends;
+  char order[TSIG_TIMESIGNAL_MSG_SIZE] = {""};
+  int len = 0;
+
+#ifdef TSIG_HAVE_BACKENDS
+  if (cfg->backend != TSIG_BACKEND_UNKNOWN) {
+    backend[0] = timesignal_backends[cfg->backend];
+    backend[1].backend = TSIG_BACKEND_UNKNOWN;
+  }
+#endif /* TSIG_HAVE_BACKENDS */
+
+  for (; backend->backend != TSIG_BACKEND_UNKNOWN; backend++)
+    len += sprintf(&order[len], "%s%s", len ? " " : "",
+                   tsig_backend_name(backend->backend));
+
+  tsig_log_dbg("Output method order: %s", order);
+}
+
 int main(int argc, char *argv[]) {
   tsig_backend_info_t *backend = timesignal_backends;
   tsig_station_t *station = &timesignal_station;
   tsig_cfg_t *cfg = &timesignal_cfg;
   tsig_log_t *log = &timesignal_log;
-
   bool is_done = false;
-  const char *name;
   int err;
 
   tsig_log_init(log);
@@ -107,20 +130,16 @@ int main(int argc, char *argv[]) {
   else if (err == TSIG_CFG_INIT_HELP)
     exit(EXIT_SUCCESS);
 
+  tsig_log_tty("%s %s <%s>", TSIG_DEFAULTS_NAME, TSIG_DEFAULTS_VERSION,
+               TSIG_DEFAULTS_URL);
+  tsig_log_tty("%s", TSIG_DEFAULTS_DESCRIPTION);
+  tsig_log_tty("");
+
   tsig_station_init(station, cfg, log);
 
-#ifdef TSIG_HAVE_BACKENDS
-  if (cfg->backend != TSIG_BACKEND_UNKNOWN) {
-    backend[0] = timesignal_backends[cfg->backend];
-    backend[1].backend = TSIG_BACKEND_UNKNOWN;
-  }
-#endif /* TSIG_HAVE_BACKENDS */
+  timesignal_find_backend_order(cfg, log);
 
   for (; !is_done && backend->backend != TSIG_BACKEND_UNKNOWN; backend++) {
-    name = tsig_backend_name(backend->backend);
-
-    tsig_log("Trying %s backend.", name);
-
     err = backend->lib_init(log);
     if (err < 0)
       continue;
