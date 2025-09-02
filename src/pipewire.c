@@ -120,14 +120,14 @@ static void pipewire_on_process(void *data) {
 
   pw_buf = pipewire_pw_stream_dequeue_buffer(pipewire->stream);
   if (!pw_buf) {
-    tsig_log_warn("failed to dequeue buffer during process event");
+    tsig_log_warn("Failed to dequeue buffer during process event");
     return;
   }
 
   spa_buf = pw_buf->buffer;
   buf = spa_buf->datas[0].data;
   if (!buf) {
-    tsig_log_warn("failed to locate output buffer during process event");
+    tsig_log_warn("Failed to locate output buffer during process event");
     return;
   }
 
@@ -200,7 +200,7 @@ static void pipewire_print(tsig_pipewire_t *pipewire) {
 int tsig_pipewire_lib_init(tsig_log_t *log) {
   pipewire_lib = dlopen(pipewire_lib_soname, RTLD_LAZY);
   if (!pipewire_lib) {
-    tsig_log_err("failed to load PipeWire library: %s", dlerror());
+    tsig_log_err("Failed to load PipeWire library: %s", dlerror());
     return -EINVAL;
   }
 
@@ -208,7 +208,7 @@ int tsig_pipewire_lib_init(tsig_log_t *log) {
   do {                                                                    \
     *(void **)(&pipewire_##f) = dlsym(pipewire_lib, #f);                  \
     if (!pipewire_##f) {                                                  \
-      tsig_log_err("failed to load PipeWire library function %s: %s", #f, \
+      tsig_log_err("Failed to load PipeWire library function %s: %s", #f, \
                    dlerror());                                            \
       return -EINVAL;                                                     \
     }                                                                     \
@@ -271,14 +271,14 @@ int tsig_pipewire_init(tsig_pipewire_t *pipewire, tsig_cfg_t *cfg,
       (!is_le && cfg->format == TSIG_AUDIO_FORMAT_FLOAT64_LE) ||
       format == SPA_AUDIO_FORMAT_UNKNOWN) {
     format = SPA_AUDIO_FORMAT_S16;
-    tsig_log_note("failed to set format %s, fallback to %s",
+    tsig_log_note("Failed to set format %s, fallback to %s",
                   tsig_audio_format_name(cfg->format),
                   tsig_audio_format_name(TSIG_AUDIO_FORMAT_S16));
   }
 
   if (channels > SPA_AUDIO_MAX_CHANNELS) {
     channels = SPA_AUDIO_MAX_CHANNELS;
-    tsig_log_note("failed to set channels %" PRIu16 ", fallback to %" PRIu16,
+    tsig_log_note("Failed to set channels %" PRIu16 ", fallback to %" PRIu16,
                   cfg->channels, channels);
   }
 
@@ -286,7 +286,7 @@ int tsig_pipewire_init(tsig_pipewire_t *pipewire, tsig_cfg_t *cfg,
 
   pipewire->loop = pipewire_pw_main_loop_new(NULL);
   if (!pipewire->loop) {
-    tsig_log_err("failed to create PipeWire main loop");
+    tsig_log_err("Failed to create PipeWire main loop");
     return err;
   }
 
@@ -306,7 +306,7 @@ int tsig_pipewire_init(tsig_pipewire_t *pipewire, tsig_cfg_t *cfg,
       pipewire_pw_stream_new_simple(loop, TSIG_DEFAULTS_NAME "-pipewire", props,
                                     &pipewire_stream_events, (void *)pipewire);
   if (!pipewire->stream) {
-    tsig_log_err("failed to create PipeWire stream");
+    tsig_log_err("Failed to create PipeWire stream");
     goto out_deinit;
   }
 
@@ -321,7 +321,7 @@ int tsig_pipewire_init(tsig_pipewire_t *pipewire, tsig_cfg_t *cfg,
       pipewire->stream, PW_DIRECTION_OUTPUT, PW_ID_ANY,
       PW_STREAM_FLAG_AUTOCONNECT | PW_STREAM_FLAG_MAP_BUFFERS, params, 1);
   if (err < 0) {
-    tsig_log_err("failed to connect to PipeWire stream");
+    tsig_log_err("Failed to connect to PipeWire stream");
     goto out_deinit;
   }
 
@@ -344,15 +344,15 @@ int tsig_pipewire_init(tsig_pipewire_t *pipewire, tsig_cfg_t *cfg,
 
   pipewire->cb_buf = malloc(buffer_size * sizeof(double));
   if (!pipewire->cb_buf) {
-    tsig_log_err("failed to allocate generated sample buffer");
+    tsig_log_err("Failed to allocate generated sample buffer");
     err = -ENOMEM;
     goto out_deinit;
   }
 
 #ifndef TSIG_DEBUG
   tsig_log_dbg(
-      "started PipeWire stream %s"
-      " %" PRIu32 " Hz %" PRIu16 "ch, buffer %" PRIu32,
+      "Started PipeWire stream %s"
+      " %" PRIu32 " Hz %" PRIu16 "ch, buffer %" PRIu32 ".",
       pipewire_format_name(format), cfg->rate, channels, buffer_size);
 #else
   pipewire_print(pipewire);
@@ -422,7 +422,7 @@ int tsig_pipewire_lib_deinit(tsig_log_t *log) {
   if (!dlclose(pipewire_lib))
     return 0;
 
-  tsig_log_err("failed to unload PipeWire library: %s", dlerror());
+  tsig_log_err("Failed to unload PipeWire library: %s", dlerror());
 
   return -EINVAL;
 }

@@ -652,7 +652,7 @@ static void station_xmit_wwvb(tsig_station_t *station, int64_t utc_timestamp) {
 /** Print transmit level flags. */
 void station_xmit_level_print(tsig_log_t *log, uint8_t xmit_level[]) {
 #ifndef TSIG_DEBUG
-  tsig_log_dbg("transmit level flags for this minute:");
+  tsig_log_dbg("Transmit level flags for this minute:");
 #endif /* TSIG_DEBUG */
   uint8_t bit = 0x01;
   uint8_t i = 0;
@@ -813,9 +813,8 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size) {
     /* clang-format on */
 
     if (expected && expected != station_first_run) {
-      tsig_log_note("Resynced to %s UTC.", msg);
-      tsig_log_note("System clock was %" PRIu64 " ms %s than expected.", drift,
-                    now < expected ? "less" : "more");
+      tsig_log_note("Resynced to %s UTC (delta %s%" PRIu64 " ms).", msg,
+                    now < expected ? "-" : "+", drift);
     } else {
       tsig_log("Synced to %s UTC.", msg);
     }
@@ -988,10 +987,10 @@ void tsig_station_init(tsig_station_t *station, tsig_cfg_t *cfg,
 
   tsig_log("%s.", msg);
 
-  tsig_log_dbg("gain smoothing %s, ultrasound output %s",
+  tsig_log_dbg("Gain smoothing %s, ultrasound output %s.",
                smooth ? "on" : "off", ultrasound ? "allowed" : "not allowed");
-  tsig_log_dbg("generating %" PRIu32 " Hz carrier"
-               " (subharmonic %" PRIu32 " of %" PRIu32 " Hz)",
+  tsig_log_dbg("Generating %" PRIu32 " Hz carrier"
+               " (subharmonic %" PRIu32 " of %" PRIu32 " Hz).",
                freq / subharmonic, subharmonic, freq);
   /* clang-format on */
 }

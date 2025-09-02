@@ -144,7 +144,7 @@ void tsig_log_finish_init(tsig_log_t *log, char log_file[], bool syslog,
     log->log_file = fopen(log_file, "a");
 
     if (!log->log_file)
-      tsig_log_warn("failed to open log file \"%s\": %s", log_file,
+      tsig_log_warn("Failed to open log file \"%s\": %s", log_file,
                     strerror(errno));
   }
 

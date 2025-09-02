@@ -545,7 +545,7 @@ static bool cfg_set_station(tsig_cfg_t *cfg, tsig_log_t *log, const char *str) {
   tsig_station_id_t station = tsig_station_id(str);
 
   if (station == TSIG_STATION_ID_UNKNOWN) {
-    tsig_log_err("invalid station \"%s\"", str);
+    tsig_log_err("Invalid station \"%s\"", str);
     return false;
   }
 
@@ -559,7 +559,7 @@ static bool cfg_set_base(tsig_cfg_t *cfg, tsig_log_t *log, const char *str) {
 
   if (!cfg_parse_base(str, &base)) {
     tsig_log_err(
-        "invalid base time \"%s\" must be between "
+        "Invalid time base \"%s\" must be between "
         "1970-01-01 00:00:00+0000 and 9999-12-31 23:59:59+2359",
         str);
     return false;
@@ -575,7 +575,7 @@ static bool cfg_set_offset(tsig_cfg_t *cfg, tsig_log_t *log, const char *str) {
 
   if (!cfg_parse_offset(str, &offset)) {
     tsig_log_err(
-        "invalid offset \"%s\" must be between -23:59:59.999 and 23:59:59.999",
+        "Invalid offset \"%s\" must be between -23:59:59.999 and 23:59:59.999",
         str);
     return false;
   }
@@ -588,14 +588,9 @@ static bool cfg_set_offset(tsig_cfg_t *cfg, tsig_log_t *log, const char *str) {
 static bool cfg_set_dut1(tsig_cfg_t *cfg, tsig_log_t *log, const char *str) {
   long dut1;
 
-  if (!cfg_strtol(str, &dut1)) {
-    tsig_log_err("invalid dut1 \"%s\"", str);
-    return false;
-  }
-
-  if (!(cfg_dut1_min < dut1 && dut1 < cfg_dut1_max)) {
-    tsig_log_err("dut1 %ld must be between %ld and %ld", dut1, cfg_dut1_min + 1,
-                 cfg_dut1_max - 1);
+  if (!cfg_strtol(str, &dut1) ||
+      !(cfg_dut1_min < dut1 && dut1 < cfg_dut1_max)) {
+    tsig_log_err("Invalid dut1 \"%s\" must be between -999 and 999", str);
     return false;
   }
 
@@ -609,7 +604,7 @@ static bool cfg_set_timeout(tsig_cfg_t *cfg, tsig_log_t *log, const char *str) {
 
   if (!cfg_parse_offset(str, &timeout) ||
       (!(cfg_timeout_min < timeout && timeout < cfg_timeout_max))) {
-    tsig_log_err("invalid timeout \"%s\" must be between 00:00:01 and 23:59:59",
+    tsig_log_err("Invalid timeout \"%s\" must be between 00:00:01 and 23:59:59",
                  str);
     return false;
   }
@@ -624,7 +619,7 @@ static bool cfg_set_backend(tsig_cfg_t *cfg, tsig_log_t *log, const char *str) {
   tsig_backend_t backend = tsig_backend(str);
 
   if (backend == TSIG_BACKEND_UNKNOWN) {
-    tsig_log_err("invalid method \"%s\"", str);
+    tsig_log_err("Invalid output method \"%s\"", str);
     return false;
   }
 
@@ -650,7 +645,7 @@ static bool cfg_set_format(tsig_cfg_t *cfg, tsig_log_t *log, const char *str) {
   tsig_audio_format_t format = tsig_audio_format(str);
 
   if (format == TSIG_AUDIO_FORMAT_UNKNOWN) {
-    tsig_log_err("invalid format \"%s\"", str);
+    tsig_log_err("Invalid format \"%s\"", str);
     return false;
   }
 
@@ -663,7 +658,7 @@ static bool cfg_set_rate(tsig_cfg_t *cfg, tsig_log_t *log, const char *str) {
   tsig_audio_rate_t rate = tsig_audio_rate(str);
 
   if (rate == TSIG_AUDIO_RATE_UNKNOWN) {
-    tsig_log_err("invalid rate \"%s\"", str);
+    tsig_log_err("Invalid rate \"%s\"", str);
     return false;
   }
 
@@ -676,14 +671,9 @@ static bool cfg_set_channels(tsig_cfg_t *cfg, tsig_log_t *log,
                              const char *str) {
   long channels;
 
-  if (!cfg_strtol(str, &channels)) {
-    tsig_log_err("invalid channels \"%s\"", str);
-    return false;
-  }
-
-  if (!(cfg_channels_min < channels && channels < cfg_channels_max)) {
-    tsig_log_err("channels %ld must be between %ld and %ld", channels,
-                 cfg_channels_min + 1, cfg_channels_max - 1);
+  if (!cfg_strtol(str, &channels) ||
+      !(cfg_channels_min < channels && channels < cfg_channels_max)) {
+    tsig_log_err("Invalid channels \"%s\" must be between 1 and 1023", str);
     return false;
   }
 
@@ -698,7 +688,7 @@ static bool cfg_set_smooth(tsig_cfg_t *cfg, tsig_log_t *log, const char *str) {
   } else if (!tsig_util_strcasecmp(str, "off")) {
     cfg->smooth = false;
   } else {
-    tsig_log_err("smooth \"%s\" must be \"on\" or \"off\"", str);
+    tsig_log_err("Invalid smooth \"%s\" must be \"on\" or \"off\"", str);
     return false;
   }
 
@@ -713,7 +703,7 @@ static bool cfg_set_ultrasound(tsig_cfg_t *cfg, tsig_log_t *log,
   } else if (!tsig_util_strcasecmp(str, "off")) {
     cfg->ultrasound = false;
   } else {
-    tsig_log_err("ultrasound \"%s\" must be \"on\" or \"off\"", str);
+    tsig_log_err("Invalid ultrasound \"%s\" must be \"on\" or \"off\"", str);
     return false;
   }
 
@@ -738,7 +728,7 @@ static bool cfg_set_syslog(tsig_cfg_t *cfg, tsig_log_t *log, const char *str) {
   } else if (!tsig_util_strcasecmp(str, "off")) {
     cfg->syslog = false;
   } else {
-    tsig_log_err("syslog \"%s\" must be \"on\" or \"off\"", str);
+    tsig_log_err("Invalid syslog \"%s\" must be \"on\" or \"off\"", str);
     return false;
   }
 
@@ -751,7 +741,7 @@ static bool cfg_set_verbosity(tsig_cfg_t *cfg, tsig_log_t *log,
   long verbosity;
 
   if (!cfg_strtol(str, &verbosity) || !(0 <= verbosity && verbosity <= 2)) {
-    tsig_log_err("invalid verbosity \"%s\"", str);
+    tsig_log_err("Invalid verbosity \"%s\" must be between 0 and 2", str);
     return false;
   }
 
@@ -883,7 +873,7 @@ static bool cfg_parse_file(tsig_cfg_t *cfg, tsig_log_t *log, const char *path) {
     if (!strcmp(path, TSIG_DEFAULTS_CFG_FILE))
       return true; /* Don't try to be clever re: errno; it's not worth it. */
 
-    tsig_log_err("failed to open config file \"%s\": %s", path,
+    tsig_log_err("Failed to open config file \"%s\": %s", path,
                  strerror(errno));
     return false;
   }
@@ -901,7 +891,7 @@ static bool cfg_parse_file(tsig_cfg_t *cfg, tsig_log_t *log, const char *path) {
 
     int k = cfg_setter_index(name);
     if (k < 0) {
-      tsig_log_err("option \"%s\" on line %d of config file \"%s\" is invalid",
+      tsig_log_err("Option \"%s\" on line %d of config file \"%s\" is invalid",
                    name, line_num, path);
       is_ok = false;
       goto continue_free_line;
@@ -915,7 +905,7 @@ static bool cfg_parse_file(tsig_cfg_t *cfg, tsig_log_t *log, const char *path) {
 
     if (!value && is_value_required) {
       tsig_log_err(
-          "option \"%s\" on line %d of config file \"%s\" requires a value",
+          "Option \"%s\" on line %d of config file \"%s\" requires a value",
           option_name, line_num, path);
       is_ok = false;
       goto continue_free_line;
@@ -923,7 +913,7 @@ static bool cfg_parse_file(tsig_cfg_t *cfg, tsig_log_t *log, const char *path) {
 
     if (!setter(cfg, log, value)) {
       tsig_log_err(
-          "failed to set option \"%s\" on line %d of config file \"%s\"",
+          "Failed to set option \"%s\" on line %d of config file \"%s\"",
           option_name, line_num, path);
       is_ok = false;
     }
@@ -934,12 +924,12 @@ static bool cfg_parse_file(tsig_cfg_t *cfg, tsig_log_t *log, const char *path) {
   }
 
   if (ferror(file)) {
-    tsig_log_err("failed to read config file \"%s\": %s", strerror(errno));
+    tsig_log_err("Failed to read config file \"%s\": %s", strerror(errno));
     is_ok = false;
   }
 
   if (fclose(file) < 0) {
-    tsig_log_err("failed to close config file \"%s\": %s", strerror(errno));
+    tsig_log_err("Failed to close config file \"%s\": %s", strerror(errno));
     is_ok = false;
   }
 

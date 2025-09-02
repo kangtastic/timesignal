@@ -143,7 +143,7 @@ int main(int argc, char *argv[]) {
 
     err = backend->loop(backend->data, tsig_station_cb, (void *)station);
     if (err < 0)
-      tsig_log_err("failed to cleanly exit output loop");
+      tsig_log_err("Failed to cleanly exit output loop!");
 
     /* TODO: Improve error handling logic. */
     is_done = true;
@@ -155,7 +155,7 @@ int main(int argc, char *argv[]) {
   }
 
   if (!is_done) {
-    tsig_log_err("failed to find a suitable audio backend\n");
+    tsig_log_err("Failed to find a suitable audio backend!");
     exit(EXIT_FAILURE);
   }
 

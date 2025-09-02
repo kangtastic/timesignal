@@ -162,7 +162,7 @@ static void pulse_print(tsig_pulse_t *pulse) {
 int tsig_pulse_lib_init(tsig_log_t *log) {
   pulse_lib = dlopen(pulse_lib_soname, RTLD_LAZY);
   if (!pulse_lib) {
-    tsig_log_err("failed to load PulseAudio library: %s", dlerror());
+    tsig_log_err("Failed to load PulseAudio library: %s", dlerror());
     return -EINVAL;
   }
 
@@ -170,7 +170,7 @@ int tsig_pulse_lib_init(tsig_log_t *log) {
   do {                                                                      \
     *(void **)(&pulse_##f) = dlsym(pulse_lib, #f);                          \
     if (!pulse_##f) {                                                       \
-      tsig_log_err("failed to load PulseAudio library function %s: %s", #f, \
+      tsig_log_err("Failed to load PulseAudio library function %s: %s", #f, \
                    dlerror());                                              \
       return -EINVAL;                                                       \
     }                                                                       \
@@ -234,33 +234,33 @@ int tsig_pulse_init(tsig_pulse_t *pulse, tsig_cfg_t *cfg, tsig_log_t *log) {
 
   if (format == PA_SAMPLE_INVALID) {
     format = PA_SAMPLE_S16NE;
-    tsig_log_note("failed to set format %s, fallback to %s",
+    tsig_log_note("Failed to set format %s, fallback to %s",
                   tsig_audio_format_name(cfg->format),
                   tsig_audio_format_name(TSIG_AUDIO_FORMAT_S16));
   }
 
   if (rate > PA_RATE_MAX) {
     rate = PA_RATE_MAX;
-    tsig_log_note("failed to set rate near %" PRIu32 ", fallback to %" PRIu32,
+    tsig_log_note("Failed to set rate near %" PRIu32 ", fallback to %" PRIu32,
                   cfg->rate, rate);
   }
 
   if (channels > PA_CHANNELS_MAX) {
     channels = PA_CHANNELS_MAX;
-    tsig_log_note("failed to set channels %" PRIu16 ", fallback to %" PRIu16,
+    tsig_log_note("Failed to set channels %" PRIu16 ", fallback to %" PRIu16,
                   cfg->channels, channels);
   }
 
   pulse->loop = pulse_pa_mainloop_new();
   if (!pulse->loop) {
-    tsig_log_err("failed to create PulseAudio main loop");
+    tsig_log_err("Failed to create PulseAudio main loop");
     return err;
   }
 
   pulse->ctx = pulse_pa_context_new(pulse_pa_mainloop_get_api(pulse->loop),
                                     TSIG_DEFAULTS_NAME);
   if (!pulse->ctx) {
-    tsig_log_err("failed to create PulseAudio context");
+    tsig_log_err("Failed to create PulseAudio context");
     goto out_deinit;
   }
 
@@ -268,7 +268,7 @@ int tsig_pulse_init(tsig_pulse_t *pulse, tsig_cfg_t *cfg, tsig_log_t *log) {
                                       pulse);
   err = pulse_pa_context_connect(pulse->ctx, NULL, 0, NULL);
   if (err < 0) {
-    tsig_log_err("failed to connect to PulseAudio context");
+    tsig_log_err("Failed to connect to PulseAudio context");
     goto out_deinit;
   }
 
@@ -276,13 +276,13 @@ int tsig_pulse_init(tsig_pulse_t *pulse, tsig_cfg_t *cfg, tsig_log_t *log) {
   while (pulse->state != PA_CONTEXT_READY) {
     err = pulse_pa_mainloop_iterate(pulse->loop, 1, NULL);
     if (err < 0) {
-      tsig_log_err("failed iterating PulseAudio main loop");
+      tsig_log_err("Failed iterating PulseAudio main loop");
       goto out_deinit;
     }
 
     if (pulse->state == PA_CONTEXT_FAILED ||
         pulse->state == PA_CONTEXT_TERMINATED) {
-      tsig_log_err("failed to make PulseAudio context ready");
+      tsig_log_err("Failed to make PulseAudio context ready");
       goto out_deinit;
     }
   }
@@ -291,7 +291,7 @@ int tsig_pulse_init(tsig_pulse_t *pulse, tsig_cfg_t *cfg, tsig_log_t *log) {
   stream =
       pulse_pa_stream_new(pulse->ctx, TSIG_DEFAULTS_NAME "-pulse", &spec, NULL);
   if (!stream) {
-    tsig_log_err("failed to create PulseAudio stream");
+    tsig_log_err("Failed to create PulseAudio stream");
     goto out_deinit;
   }
   pulse_pa_stream_set_write_callback(stream, pulse_stream_write_cb, pulse);
@@ -307,7 +307,7 @@ int tsig_pulse_init(tsig_pulse_t *pulse, tsig_cfg_t *cfg, tsig_log_t *log) {
       stream, NULL, &attr,
       PA_STREAM_INTERPOLATE_TIMING | PA_STREAM_AUTO_TIMING_UPDATE, NULL, NULL);
   if (err < 0) {
-    tsig_log_err("failed to connect to PulseAudio stream");
+    tsig_log_err("Failed to connect to PulseAudio stream");
     goto out_deinit;
   }
 
@@ -328,7 +328,7 @@ int tsig_pulse_init(tsig_pulse_t *pulse, tsig_cfg_t *cfg, tsig_log_t *log) {
 
   pulse->cb_buf = malloc(buffer_size * sizeof(double));
   if (!pulse->cb_buf) {
-    tsig_log_err("failed to allocate generated sample buffer");
+    tsig_log_err("Failed to allocate generated sample buffer");
     err = -ENOMEM;
     goto out_deinit;
   }
@@ -341,15 +341,15 @@ int tsig_pulse_init(tsig_pulse_t *pulse, tsig_cfg_t *cfg, tsig_log_t *log) {
 
   pulse->buf = malloc(pulse->stride * buffer_size);
   if (!pulse->buf) {
-    tsig_log_err("failed to allocate client-side output buffer");
+    tsig_log_err("Failed to allocate client-side output buffer");
     err = -ENOMEM;
     goto out_deinit;
   }
 
 #ifndef TSIG_DEBUG
   tsig_log_dbg(
-      "started PulseAudio stream %s"
-      " %" PRIu32 " Hz %" PRIu16 "ch, buffer %" PRIu32,
+      "Started PulseAudio stream %s"
+      " %" PRIu32 " Hz %" PRIu16 "ch, buffer %" PRIu32 ".",
       pulse_pa_sample_format_to_string(format), rate, channels, buffer_size);
 #else
   pulse_print(pulse);
@@ -379,7 +379,7 @@ int tsig_pulse_loop(tsig_pulse_t *pulse, tsig_audio_cb_t cb, void *cb_data) {
   /* Install PulseAudio signal handler.*/
   err = pulse_pa_signal_init(pulse_pa_mainloop_get_api(pulse->loop));
   if (err < 0) {
-    tsig_log_err("failed to initialize PulseAudio signal subsystem");
+    tsig_log_err("Failed to initialize PulseAudio signal subsystem");
     return err;
   }
 
@@ -430,7 +430,7 @@ int tsig_pulse_lib_deinit(tsig_log_t *log) {
   if (!dlclose(pulse_lib))
     return 0;
 
-  tsig_log_err("failed to unload PulseAudio library: %s", dlerror());
+  tsig_log_err("Failed to unload PulseAudio library: %s", dlerror());
 
   return -EINVAL;
 }
