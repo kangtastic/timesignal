@@ -94,10 +94,9 @@ pa_sample_format_t pulse_format(const tsig_audio_format_t format) {
 static void pulse_signal_cb(pa_mainloop_api *api, pa_signal_event *event,
                             int signal, void *data) {
   tsig_pulse_t *pulse = data;
-  (void)api;    /* Suppress unused parameter warning. */
-  (void)event;  /* Suppress unused parameter warning. */
-  (void)signal; /* Suppress unused parameter warning. */
-  pulse_pa_mainloop_quit(pulse->loop, 0);
+  (void)api;   /* Suppress unused parameter warning. */
+  (void)event; /* Suppress unused parameter warning. */
+  pulse_pa_mainloop_quit(pulse->loop, signal);
 }
 
 /** PulseAudio context state change callback. */
@@ -369,7 +368,8 @@ out_deinit:
  * @param pulse Initialized PulseAudio output context.
  * @param cb Sample generator callback function.
  * @param cb_data Callback function context object.
- * @return 0 if loop exited normally, negative error code upon error.
+ * @return Signal value if loop exited normally,
+ *  negative error code upon error.
  */
 int tsig_pulse_loop(tsig_pulse_t *pulse, tsig_audio_cb_t cb, void *cb_data) {
   tsig_log_t *log = pulse->log;

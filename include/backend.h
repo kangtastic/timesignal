@@ -56,7 +56,8 @@ typedef int (*tsig_backend_init_t)(void *ab_data, tsig_cfg_t *cfg,
  * @param ab_data Initialized audio backend context object.
  * @param cb Sample generator callback function.
  * @param cb_data Callback function context object.
- * @return 0 if loop exited normally, negative error code upon error.
+ * @return Signal value if loop exited normally,
+ *  negative error code upon error.
  */
 typedef int (*tsig_backend_loop_t)(void *ab_data, tsig_audio_cb_t cb,
                                    void *cb_data);

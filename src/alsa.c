@@ -70,8 +70,10 @@ static snd_pcm_sframes_t (*alsa_snd_pcm_writei)(snd_pcm_t *pcm, const void *buff
 static const char *(*alsa_snd_strerror)(int errnum);
 /* clang-format on */
 
-/* Signal status flag. */
-static volatile sig_atomic_t alsa_got_signal = 0;
+/* Signal status flags. */
+static volatile sig_atomic_t alsa_got_sigint = 0;
+static volatile sig_atomic_t alsa_got_sigalrm = 0;
+static volatile sig_atomic_t alsa_got_sigterm = 0;
 
 /** Default buffer time in us. */
 static const unsigned alsa_buffer_time = 200000;
@@ -110,8 +112,12 @@ static const tsig_mapping_nn_t alsa_format_map[] = {
 
 /** Signal handler. */
 static void alsa_signal_handler(int signal) {
-  (void)signal; /* Suppress unused parameter warning. */
-  alsa_got_signal = 1;
+  if (signal == SIGINT)
+    alsa_got_sigint = 1;
+  else if (signal == SIGALRM)
+    alsa_got_sigalrm = 1;
+  else if (signal == SIGTERM)
+    alsa_got_sigterm = 1;
 }
 
 /** Sample format lookup. */
@@ -326,10 +332,20 @@ static int alsa_loop_wait(snd_pcm_t *pcm, struct pollfd *pfds, unsigned nfds) {
 
   for (;;) {
     if (poll(pfds, nfds, -1) < 0) {
-      if (errno == EINTR && alsa_got_signal) {
-        alsa_got_signal = 0;
+      if (errno == EINTR) {
+        if (alsa_got_sigint) {
+          alsa_got_sigint = 0;
+          return SIGINT;
+        } else if (alsa_got_sigalrm) {
+          alsa_got_sigalrm = 0;
+          return SIGALRM;
+        } else if (alsa_got_sigterm) {
+          alsa_got_sigterm = 0;
+          return SIGTERM;
+        }
         return -EINTR;
       }
+      return -EINVAL;
     }
 
     alsa_snd_pcm_poll_descriptors_revents(pcm, pfds, nfds, &revents);
@@ -489,7 +505,8 @@ out_deinit:
  * @param alsa Initialized ALSA output context.
  * @param cb Sample generator callback function.
  * @param cb_data Callback function context object.
- * @return 0 if loop exited normally, negative error code upon error.
+ * @return Signal value if loop exited normally,
+ *  negative error code upon error.
  */
 int tsig_alsa_loop(tsig_alsa_t *alsa, tsig_audio_cb_t cb, void *cb_data) {
   int phys_width = alsa_snd_pcm_format_physical_width(alsa->format) / CHAR_BIT;
@@ -557,11 +574,10 @@ int tsig_alsa_loop(tsig_alsa_t *alsa, tsig_audio_cb_t cb, void *cb_data) {
   for (;;) {
     if (is_running) {
       err = alsa_loop_wait(pcm, pfds, nfds);
-      if (err == -EINTR) {
-        err = 0;
-        goto out_restore_signals;
-      } else if (err == -EIO) {
+      if (err == -EINTR || err == -EIO) {
         tsig_log_err("Failed to wait for poll: %s", alsa_snd_strerror(err));
+        goto out_restore_signals;
+      } else if (err == SIGINT || err == SIGTERM || err == SIGALRM) {
         goto out_restore_signals;
       } else if (err < 0) {
         alsa_xrun_recover(log, pcm, err);
@@ -601,11 +617,10 @@ int tsig_alsa_loop(tsig_alsa_t *alsa, tsig_audio_cb_t cb, void *cb_data) {
         break;
 
       err = alsa_loop_wait(pcm, pfds, nfds);
-      if (err == -EINTR) {
-        err = 0;
-        goto out_restore_signals;
-      } else if (err == -EIO) {
+      if (err == -EINTR || err == -EIO) {
         tsig_log_err("Failed to wait for poll: %s", alsa_snd_strerror(err));
+        goto out_restore_signals;
+      } else if (err == SIGINT || err == SIGTERM || err == SIGALRM) {
         goto out_restore_signals;
       } else if (err < 0) {
         alsa_xrun_recover(log, pcm, err);

@@ -23,6 +23,7 @@ typedef struct tsig_log tsig_log_t;
 typedef struct tsig_pipewire {
   struct pw_main_loop *loop; /** Loop. */
   struct pw_stream *stream;  /** Stream. */
+  int loop_ret;              /** Loop return value. */
 
   enum spa_audio_format format; /** Sample format. */
   uint32_t rate;                /** Sample rate. */

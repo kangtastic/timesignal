@@ -105,7 +105,7 @@ static const char *pipewire_format_name(const enum spa_audio_format format) {
 /** PipeWire signal handler. */
 static void pipewire_on_signal(void *data, int signal) {
   tsig_pipewire_t *pipewire = data;
-  (void)signal; /* Suppress unused parameter warning. */
+  pipewire->loop_ret = signal;
   pipewire_pw_main_loop_quit(pipewire->loop);
 }
 
@@ -176,6 +176,7 @@ static void pipewire_print(tsig_pipewire_t *pipewire) {
   tsig_log_dbg("tsig_pipewire_t %p = {", pipewire);
   tsig_log_dbg("  .loop         = %p,", pipewire->loop);
   tsig_log_dbg("  .stream       = %p,", pipewire->stream);
+  tsig_log_dbg("  .loop_ret     = %d,", pipewire->loop_ret);
   tsig_log_dbg("  .format       = %s,", format);
   tsig_log_dbg("  .rate         = %" PRIu32 ",", pipewire->rate);
   tsig_log_dbg("  .channels     = %" PRIu16 ",", pipewire->channels);
@@ -255,6 +256,7 @@ int tsig_pipewire_init(tsig_pipewire_t *pipewire, tsig_cfg_t *cfg,
   int err = -1;
 
   *pipewire = (tsig_pipewire_t){
+      .loop_ret = -1,
       .timeout = cfg->timeout,
       .log = log,
   };
@@ -372,7 +374,8 @@ out_deinit:
  * @param pipewire Initialized PipeWire output context.
  * @param cb Sample generator callback function.
  * @param cb_data Callback function context object.
- * @return 0 if loop exited normally, negative error code upon error.
+ * @return Signal value if loop exited normally,
+ *  negative error code upon error.
  */
 int tsig_pipewire_loop(tsig_pipewire_t *pipewire, tsig_audio_cb_t cb,
                        void *cb_data) {
@@ -391,7 +394,7 @@ int tsig_pipewire_loop(tsig_pipewire_t *pipewire, tsig_audio_cb_t cb,
   err = pipewire_pw_main_loop_run(pipewire->loop);
   alarm(0);
 
-  return err;
+  return err < 0 ? err : pipewire->loop_ret;
 }
 
 /**

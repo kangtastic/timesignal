@@ -25,6 +25,7 @@
 #include "pulse.h"
 #endif /* TSIG_HAVE_PULSE */
 
+#include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -161,10 +162,15 @@ int main(int argc, char *argv[]) {
 #endif /* TSIG_HAVE_ALSA */
 
     err = backend->loop(backend->data, tsig_station_cb, (void *)station);
-    if (err < 0)
+    if (err == SIGINT)
+      tsig_log_note("Exiting on interrupt.");
+    else if (err == SIGALRM)
+      tsig_log("Exiting as scheduled.");
+    else if (err == SIGTERM)
+      tsig_log_warn("Exiting on SIGTERM!");
+    else if (err < 0)
       tsig_log_err("Failed to cleanly exit output loop!");
 
-    /* TODO: Improve error handling logic. */
     is_done = true;
 
     backend->deinit(backend->data);
