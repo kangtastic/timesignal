@@ -83,7 +83,8 @@ endif
 
 all:              $(TARGET)
 
-debug:            CFLAGS := $(filter-out -O2,$(CFLAGS)) -O0 -g -DTSIG_DEBUG
+debug:            CFLAGS := $(filter-out -O2,$(CFLAGS)) -fsanitize=address -fno-omit-frame-pointer -O0 -g -DTSIG_DEBUG
+debug:            LDFLAGS += -fsanitize=address
 debug:            clean $(TARGET)
 
 $(TARGET):        $(OBJ)
