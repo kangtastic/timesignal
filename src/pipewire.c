@@ -32,6 +32,7 @@ static void *pipewire_lib;
 
 /** Pointers to PipeWire library functions. */
 /* clang-format off */
+static void (*pipewire_pw_deinit)(void);
 static void (*pipewire_pw_init)(int *argc, char ***argv);
 static void (*pipewire_pw_main_loop_destroy)(struct pw_main_loop *loop);
 static struct pw_loop *(*pipewire_pw_main_loop_get_loop)(struct pw_main_loop *loop);
@@ -215,6 +216,7 @@ int tsig_pipewire_lib_init(tsig_log_t *log) {
     }                                                                     \
   } while (0)
 
+  pipewire_dlsym_assign(pw_deinit);
   pipewire_dlsym_assign(pw_init);
   pipewire_dlsym_assign(pw_main_loop_destroy);
   pipewire_dlsym_assign(pw_main_loop_get_loop);
@@ -411,6 +413,8 @@ int tsig_pipewire_deinit(tsig_pipewire_t *pipewire) {
     pipewire_pw_main_loop_destroy(pipewire->loop);
 
   free(pipewire->cb_buf);
+
+  pipewire_pw_deinit();
 
   return 0;
 }

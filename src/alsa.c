@@ -37,6 +37,7 @@ static void *alsa_lib;
 
 /** Pointers to ALSA library functions. */
 /* clang-format off */
+static int (*alsa_snd_config_update_free_global)(void);
 static const char *(*alsa_snd_pcm_access_name)(const snd_pcm_access_t _access);
 static int (*alsa_snd_pcm_close)(snd_pcm_t *pcm);
 static const char *(*alsa_snd_pcm_format_name)(const snd_pcm_format_t format);
@@ -410,6 +411,7 @@ int tsig_alsa_lib_init(tsig_log_t *log) {
     }                                                                 \
   } while (0)
 
+  alsa_dlsym_assign(snd_config_update_free_global);
   alsa_dlsym_assign(snd_pcm_access_name);
   alsa_dlsym_assign(snd_pcm_close);
   alsa_dlsym_assign(snd_pcm_format_name);
@@ -654,8 +656,15 @@ int tsig_alsa_deinit(tsig_alsa_t *alsa) {
   int err;
 
   err = alsa_snd_pcm_close(alsa->pcm);
-  if (err < 0)
+  if (err < 0) {
     tsig_log_err("Failed to close ALSA device %s: %s", alsa->device,
+                 alsa_snd_strerror(err));
+    return err;
+  }
+
+  err = alsa_snd_config_update_free_global();
+  if (err < 0)
+    tsig_log_err("Failed to free ALSA global configuration tree: %s",
                  alsa_snd_strerror(err));
 
   return err;
