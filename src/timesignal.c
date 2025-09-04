@@ -161,6 +161,10 @@ int main(int argc, char *argv[]) {
       tsig_station_set_rate(station, timesignal_alsa.rate);
 #endif /* TSIG_HAVE_ALSA */
 
+    /* NOTE: TTY echo will not turn back on if we terminate abnormally. */
+    if (log->have_status && !atexit(tsig_log_tty_enable_echo))
+      tsig_log_tty_disable_echo();
+
     err = backend->loop(backend->data, tsig_station_cb, (void *)station);
     if (err == SIGINT)
       tsig_log_note("Exiting on interrupt.");

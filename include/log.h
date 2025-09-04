@@ -89,3 +89,5 @@ void tsig_log_msg(tsig_log_t *log, int level, const char *src_file,
 void tsig_log_msg_tty(tsig_log_t *log, int status_line, const char *src_file,
                       int src_line, const char *fmt, ...);
 void tsig_log_deinit(tsig_log_t *log);
+void tsig_log_tty_enable_echo(void);
+void tsig_log_tty_disable_echo(void);

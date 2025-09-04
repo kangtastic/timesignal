@@ -12,6 +12,7 @@
 #include "defaults.h"
 
 #include <syslog.h>
+#include <termios.h>
 #include <unistd.h>
 
 #include <errno.h>
@@ -412,4 +413,26 @@ void tsig_log_deinit(tsig_log_t *log) {
       fprintf(stdout, "%s\r%s", log_esc_line_clear, log_esc_line_scroll_up);
     fflush(stdout);
   }
+}
+
+/** Enable TTY echo. */
+void tsig_log_tty_enable_echo(void) {
+  struct termios termios;
+
+  if (tcgetattr(fileno(stdin), &termios) < 0)
+    return;
+
+  termios.c_lflag |= (tcflag_t)ECHO;
+  tcsetattr(fileno(stdin), TCSANOW, &termios);
+}
+
+/** Disable TTY echo. */
+void tsig_log_tty_disable_echo(void) {
+  struct termios termios;
+
+  if (tcgetattr(fileno(stdin), &termios) < 0)
+    return;
+
+  termios.c_lflag &= ~((tcflag_t)ECHO);
+  tcsetattr(fileno(stdin), TCSANOW, &termios);
 }
