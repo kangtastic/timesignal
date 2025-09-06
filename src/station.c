@@ -69,22 +69,23 @@ static const uint32_t station_ticks_per_iwg = 10; /* Inter-word gap. */
 static const char *station_tty_inverse = "\x1b[7m";
 static const char *station_tty_reset = "\x1b[0m";
 
-/** Pointer to a function that computes per-minute intermediate data. */
-typedef void (*station_xmit_cb_t)(tsig_station_t *station,
-                                  int64_t utc_timestamp);
+/** Pointer to a function that updates state every minute. */
+typedef void (*station_update_cb_t)(tsig_station_t *station,
+                                    int64_t utc_timestamp);
 
-/** Pointer to a function that provides per-second status updates. */
+/** Pointer to a function that logs status every second. */
 typedef void (*station_status_cb_t)(tsig_station_t *station,
                                     int64_t utc_timestamp);
 
-/** Functions that compute per-minute intermediate data. */
-static void station_xmit_bpc(tsig_station_t *station, int64_t utc_timestamp);
-static void station_xmit_dcf77(tsig_station_t *station, int64_t utc_timestamp);
-static void station_xmit_jjy(tsig_station_t *station, int64_t utc_timestamp);
-static void station_xmit_msf(tsig_station_t *station, int64_t utc_timestamp);
-static void station_xmit_wwvb(tsig_station_t *station, int64_t utc_timestamp);
+/** Functions that update state every minute. */
+static void station_update_bpc(tsig_station_t *station, int64_t utc_timestamp);
+static void station_update_dcf77(tsig_station_t *station,
+                                 int64_t utc_timestamp);
+static void station_update_jjy(tsig_station_t *station, int64_t utc_timestamp);
+static void station_update_msf(tsig_station_t *station, int64_t utc_timestamp);
+static void station_update_wwvb(tsig_station_t *station, int64_t utc_timestamp);
 
-/** Functions that provide per-second status updates. */
+/** Functions that log status every second. */
 static void station_status_bpc(tsig_station_t *station, int64_t utc_timestamp);
 static void station_status_dcf77(tsig_station_t *station,
                                  int64_t utc_timestamp);
@@ -94,23 +95,25 @@ static void station_status_wwvb(tsig_station_t *station, int64_t utc_timestamp);
 
 /** Characteristics of a real time station's signal, etc. */
 typedef struct station_info {
-  station_xmit_cb_t xmit_cb; /** Per-minute intermediate data callback. */
-  station_status_cb_t xmit_status_cb; /** Per-second status update callback. */
-  int32_t utc_offset;                 /** Usual (not summer time) UTC offset. */
-  uint32_t freq;                      /** Actual broadcast frequency. */
-  double xmit_low;                    /** Low gain in [0.0-1.0]. */
-  char *xmit_template;                /** Template for bit readout string. */
-  char *xmit_sections;    /** Bit readout sections after expansion. */
-  uint8_t xmit_bounds[8]; /** Bit readout section bounds. */
+  station_update_cb_t update_cb; /** Per-minute state update callback. */
+  station_status_cb_t status_cb; /** Per-second status logging callback. */
+  int32_t utc_offset;            /** Usual (not summer time) UTC offset. */
+  int32_t utc_st_offset;         /** Summer time UTC offset. */
+  uint32_t freq;                 /** Actual broadcast frequency. */
+  double xmit_low;               /** Low gain in [0.0-1.0]. */
+  char *xmit_template;           /** Template for bit readout string. */
+  char *xmit_sections;           /** Bit readout sections after expansion. */
+  uint8_t xmit_bounds[8];        /** Bit readout section bounds. */
 } station_info_t;
 
 static station_info_t station_info[] = {
     /* clang-format off */
     [TSIG_STATION_ID_BPC] =
         {
-            .xmit_cb = station_xmit_bpc,
-            .xmit_status_cb = station_status_bpc,
+            .update_cb = station_update_bpc,
+            .status_cb = station_status_bpc,
             .utc_offset = 28800000, /* CST is UTC+0800 */
+            .utc_st_offset = 28800000, /* still CST */
             .freq = 68500,
             .xmit_low = 3.162277660168379411765e-01, /* -10 dB */
             .xmit_template = "MM00XX0000000000X00000X00000000000000000",
@@ -119,9 +122,10 @@ static station_info_t station_info[] = {
         },
     [TSIG_STATION_ID_DCF77] =
         {
-            .xmit_cb = station_xmit_dcf77,
-            .xmit_status_cb = station_status_dcf77,
+            .update_cb = station_update_dcf77,
+            .status_cb = station_status_dcf77,
             .utc_offset = 3600000, /* CET is UTC+0100 */
+            .utc_st_offset = 7200000, /* CEST is UTC+0200 */
             .freq = 77500,
             .xmit_low = 1.496235656094433430496e-01, /* -16.5 dB */
             .xmit_template = "XXXXXXXXXXXXXXX00000X00000000000000000000000000000000000000M",
@@ -131,9 +135,10 @@ static station_info_t station_info[] = {
         },
     [TSIG_STATION_ID_JJY] =
         {
-            .xmit_cb = station_xmit_jjy,
-            .xmit_status_cb = station_status_jjy,
+            .update_cb = station_update_jjy,
+            .status_cb = station_status_jjy,
             .utc_offset = 32400000, /* JST is UTC+0900 */
+            .utc_st_offset = 32400000, /* still JST */
             .freq = 40000,
             .xmit_low = 3.162277660168379411765e-01, /* -10 dB */
             .xmit_template = "M000X0000MXX00X0000MXX00X0000M0000XX00XMX00000000M00000XXXXM",
@@ -142,9 +147,10 @@ static station_info_t station_info[] = {
         },
     [TSIG_STATION_ID_JJY60] =
         {
-            .xmit_cb = station_xmit_jjy,
-            .xmit_status_cb = station_status_jjy,
+            .update_cb = station_update_jjy,
+            .status_cb = station_status_jjy,
             .utc_offset = 32400000, /* JST is UTC+0900 */
+            .utc_st_offset = 32400000, /* still JST */
             .freq = 60000,
             .xmit_low = 3.162277660168379411765e-01, /* -10 dB */
             .xmit_template = "M000X0000MXX00X0000MXX00X0000M0000XX00XMX00000000M00000XXXXM",
@@ -153,9 +159,10 @@ static station_info_t station_info[] = {
         },
     [TSIG_STATION_ID_MSF] =
         {
-            .xmit_cb = station_xmit_msf,
-            .xmit_status_cb = station_status_msf,
+            .update_cb = station_update_msf,
+            .status_cb = station_status_msf,
             .utc_offset = 0, /* GMT is UTC+0000 */
+            .utc_st_offset = 3600000, /* BST is UTC+0100 */
             .freq = 60000,
             .xmit_low = 0.0, /* On-off keying */
             .xmit_template = "M000000000000000000000000000000000000000000000000000X000000X",
@@ -164,9 +171,10 @@ static station_info_t station_info[] = {
         },
     [TSIG_STATION_ID_WWVB] =
         {
-            .xmit_cb = station_xmit_wwvb,
-            .xmit_status_cb = station_status_wwvb,
+            .update_cb = station_update_wwvb,
+            .status_cb = station_status_wwvb,
             .utc_offset = 0, /* UTC */
+            .utc_st_offset = 0, /* still UTC */
             .freq = 60000,
             .xmit_low = 1.412537544622754492885e-01, /* -17 dB */
             .xmit_template = "M000X0000MXX00X0000MXX00X0000M0000XX000M0000X0000M0000X0000M",
@@ -206,11 +214,13 @@ static uint8_t station_odd_parity(uint8_t data[], uint32_t lo, uint32_t hi) {
   return !station_even_parity(data, lo, hi);
 }
 
-/** Compute per-minute intermediate data for BPC. */
-static void station_xmit_bpc(tsig_station_t *station, int64_t utc_timestamp) {
-  tsig_datetime_t datetime = tsig_datetime_parse_timestamp(
-      utc_timestamp + station_info[TSIG_STATION_ID_BPC].utc_offset);
+/** Per-minute state update callback for BPC. */
+static void station_update_bpc(tsig_station_t *station, int64_t utc_timestamp) {
+  station_info_t *info = &station_info[TSIG_STATION_ID_BPC];
   uint8_t bits[20] = {[0] = station_sync_marker};
+  tsig_datetime_t datetime;
+
+  datetime = tsig_datetime_parse_timestamp(utc_timestamp + info->utc_offset);
 
   uint8_t hour_12h = datetime.hour % 12;
   bits[3] = (hour_12h >> 2) & 0x3;
@@ -243,7 +253,7 @@ static void station_xmit_bpc(tsig_station_t *station, int64_t utc_timestamp) {
   bits[18] = year & 0x3;
   bits[19] = ((year >> 5) & 0x2) | station_even_parity(bits, 11, 19);
 
-  char *template = station_info[TSIG_STATION_ID_BPC].xmit_template;
+  char *template = info->xmit_template;
   for (uint32_t i = 0, j = 0, k = 1; i < sizeof(bits); i++, j += 2, k += 2) {
     station->xmit[j] = template[j] == '0' && (bits[i] & 2) ? '1' : template[j];
     station->xmit[k] = template[k] == '0' && (bits[i] & 1) ? '1' : template[k];
@@ -277,12 +287,11 @@ static void station_xmit_bpc(tsig_station_t *station, int64_t utc_timestamp) {
   }
 }
 
-/** Compute per-minute intermediate data for DCF77. */
-static void station_xmit_dcf77(tsig_station_t *station, int64_t utc_timestamp) {
+/** Per-minute state update callback for DCF77. */
+static void station_update_dcf77(tsig_station_t *station,
+                                 int64_t utc_timestamp) {
   tsig_datetime_t utc_datetime = tsig_datetime_parse_timestamp(utc_timestamp);
-
-  tsig_datetime_t datetime = tsig_datetime_parse_timestamp(
-      utc_timestamp + station_info[TSIG_STATION_ID_DCF77].utc_offset);
+  station_info_t *info = &station_info[TSIG_STATION_ID_DCF77];
   uint8_t bits[60] = {[20] = 1, [59] = station_sync_marker};
 
   /* Transmitted time is the CET/CEST time at the next UTC minute. */
@@ -295,69 +304,68 @@ static void station_xmit_dcf77(tsig_station_t *station, int64_t utc_timestamp) {
   bits[17] = is_xmit_cest;
   bits[18] = !is_xmit_cest;
 
-  uint32_t cest_offset = is_xmit_cest ? station_msecs_hour : 0;
-  uint32_t xmit_offset = station_msecs_min;
-  int64_t xmit_timestamp = datetime.timestamp + cest_offset + xmit_offset;
-  tsig_datetime_t xmit_datetime = tsig_datetime_parse_timestamp(xmit_timestamp);
+  uint32_t civil_offset = is_xmit_cest ? info->utc_st_offset : info->utc_offset;
+  int64_t timestamp = utc_timestamp + civil_offset + station_msecs_min;
+  tsig_datetime_t datetime = tsig_datetime_parse_timestamp(timestamp);
 
   bits[20] = 1;
 
-  uint8_t min = xmit_datetime.min % 10;
+  uint8_t min = datetime.min % 10;
   bits[21] = min & 1;
   bits[22] = min & 2;
   bits[23] = min & 4;
   bits[24] = min & 8;
 
-  uint8_t min_10 = xmit_datetime.min / 10;
+  uint8_t min_10 = datetime.min / 10;
   bits[25] = min_10 & 1;
   bits[26] = min_10 & 2;
   bits[27] = min_10 & 4;
 
   bits[28] = station_even_parity(bits, 21, 28);
 
-  uint8_t hour = xmit_datetime.hour % 10;
+  uint8_t hour = datetime.hour % 10;
   bits[29] = hour & 1;
   bits[30] = hour & 2;
   bits[31] = hour & 4;
   bits[32] = hour & 8;
 
-  uint8_t hour_10 = xmit_datetime.hour / 10;
+  uint8_t hour_10 = datetime.hour / 10;
   bits[33] = hour_10 & 1;
   bits[34] = hour_10 & 2;
 
   bits[35] = station_even_parity(bits, 29, 35);
 
-  uint8_t day = xmit_datetime.day % 10;
+  uint8_t day = datetime.day % 10;
   bits[36] = day & 1;
   bits[37] = day & 2;
   bits[38] = day & 4;
   bits[39] = day & 8;
 
-  uint8_t day_10 = xmit_datetime.day / 10;
+  uint8_t day_10 = datetime.day / 10;
   bits[40] = day_10 & 1;
   bits[41] = day_10 & 2;
 
-  uint8_t dow = xmit_datetime.dow ? xmit_datetime.dow : 7;
+  uint8_t dow = datetime.dow ? datetime.dow : 7;
   bits[42] = dow & 1;
   bits[43] = dow & 2;
   bits[44] = dow & 4;
 
-  uint8_t mon = xmit_datetime.mon % 10;
+  uint8_t mon = datetime.mon % 10;
   bits[45] = mon & 1;
   bits[46] = mon & 2;
   bits[47] = mon & 4;
   bits[48] = mon & 8;
 
-  uint8_t mon_10 = xmit_datetime.mon / 10;
+  uint8_t mon_10 = datetime.mon / 10;
   bits[49] = mon_10 & 1;
 
-  uint8_t year = xmit_datetime.year % 10;
+  uint8_t year = datetime.year % 10;
   bits[50] = year & 1;
   bits[51] = year & 2;
   bits[52] = year & 4;
   bits[53] = year & 8;
 
-  uint8_t year_10 = (xmit_datetime.year % 100) / 10;
+  uint8_t year_10 = (datetime.year % 100) / 10;
   bits[54] = year_10 & 1;
   bits[55] = year_10 & 2;
   bits[56] = year_10 & 4;
@@ -365,7 +373,7 @@ static void station_xmit_dcf77(tsig_station_t *station, int64_t utc_timestamp) {
 
   bits[58] = station_even_parity(bits, 36, 58);
 
-  char *template = station_info[TSIG_STATION_ID_DCF77].xmit_template;
+  char *template = info->xmit_template;
   for (uint32_t i = 0; i < sizeof(bits); i++)
     station->xmit[i] = template[i] == '0' && bits[i] ? '1' : template[i];
 
@@ -377,9 +385,9 @@ static void station_xmit_dcf77(tsig_station_t *station, int64_t utc_timestamp) {
           /* e.g. "12:34 CET, CEST next min no, weekday 4, day 31 of month 12 of year 99" */
           "%02" PRIu8 ":%02" PRIu8 " %s, %s next min %s, weekday %" PRIu8
           ", day %" PRIu8 " of month %" PRIu8 " of year %" PRIu16,
-          xmit_datetime.hour, xmit_datetime.min,
+          datetime.hour, datetime.min,
           tz, chg_tz, is_chg ? "yes" : "no", dow,
-          xmit_datetime.day, xmit_datetime.mon, xmit_datetime.year % 100);
+          datetime.day, datetime.mon, datetime.year % 100);
   /* clang-format on */
 
   /* Marker: Low for 0 ms, 0: 100 ms, 1: 200 ms. */
@@ -434,16 +442,18 @@ static void station_xmit_jjy_morse(uint8_t xmit_level[]) {
   }
 }
 
-/** Compute per-minute intermediate data for JJY and JJY60. */
-static void station_xmit_jjy(tsig_station_t *station, int64_t utc_timestamp) {
-  tsig_datetime_t datetime = tsig_datetime_parse_timestamp(
-      utc_timestamp + station_info[TSIG_STATION_ID_JJY].utc_offset);
+/** Per-minute state update callback for JJY and JJY60. */
+static void station_update_jjy(tsig_station_t *station, int64_t utc_timestamp) {
+  station_info_t *info = &station_info[TSIG_STATION_ID_JJY];
   uint8_t bits[60] = {
       [0] = station_sync_marker,  [9] = station_sync_marker,
       [19] = station_sync_marker, [29] = station_sync_marker,
       [39] = station_sync_marker, [49] = station_sync_marker,
       [59] = station_sync_marker,
   };
+  tsig_datetime_t datetime;
+
+  datetime = tsig_datetime_parse_timestamp(utc_timestamp + info->utc_offset);
 
   uint8_t min_10 = datetime.min / 10;
   bits[1] = min_10 & 4;
@@ -502,7 +512,7 @@ static void station_xmit_jjy(tsig_station_t *station, int64_t utc_timestamp) {
   bits[51] = dow & 2;
   bits[52] = dow & 1;
 
-  char *template = station_info[TSIG_STATION_ID_JJY].xmit_template;
+  char *template = info->xmit_template;
   for (uint32_t i = 0; i < sizeof(bits); i++)
     station->xmit[i] = template[i] == '0' && bits[i] ? '1' : template[i];
 
@@ -541,12 +551,10 @@ static void station_xmit_jjy(tsig_station_t *station, int64_t utc_timestamp) {
   }
 }
 
-/** Compute per-minute intermediate data for MSF. */
-static void station_xmit_msf(tsig_station_t *station, int64_t utc_timestamp) {
+/** Per-minute state update callback for MSF. */
+static void station_update_msf(tsig_station_t *station, int64_t utc_timestamp) {
   tsig_datetime_t utc_datetime = tsig_datetime_parse_timestamp(utc_timestamp);
-
-  tsig_datetime_t datetime = tsig_datetime_parse_timestamp(
-      utc_timestamp + station_info[TSIG_STATION_ID_MSF].utc_offset);
+  station_info_t *info = &station_info[TSIG_STATION_ID_MSF];
   uint8_t bits[60] = {[0] = station_sync_marker};
 
   int16_t dut1 = station->dut1 / 100;
@@ -566,65 +574,64 @@ static void station_xmit_msf(tsig_station_t *station, int64_t utc_timestamp) {
   bool is_bst = tsig_datetime_is_eu_dst(utc_datetime, &in_mins);
   bool is_chg = 1 <= in_mins && in_mins <= 61;
 
-  /* Transmitted time is the UTC/BST time at the next UTC minute. */
+  /* Transmitted time is the GMT/BST time at the next UTC minute. */
   bool is_xmit_bst = is_bst ^ (in_mins == 1);
-  uint32_t bst_offset = is_xmit_bst ? station_msecs_hour : 0;
-  uint32_t xmit_offset = station_msecs_min;
-  int64_t xmit_timestamp = datetime.timestamp + bst_offset + xmit_offset;
-  tsig_datetime_t xmit_datetime = tsig_datetime_parse_timestamp(xmit_timestamp);
+  uint32_t civil_offset = is_xmit_bst ? info->utc_st_offset : info->utc_offset;
+  int64_t timestamp = utc_timestamp + civil_offset + station_msecs_min;
+  tsig_datetime_t datetime = tsig_datetime_parse_timestamp(timestamp);
 
-  uint8_t year_10 = (xmit_datetime.year % 100) / 10;
+  uint8_t year_10 = (datetime.year % 100) / 10;
   bits[17] = year_10 & 8;
   bits[18] = year_10 & 4;
   bits[19] = year_10 & 2;
   bits[20] = year_10 & 1;
 
-  uint8_t year = xmit_datetime.year % 10;
+  uint8_t year = datetime.year % 10;
   bits[21] = year & 8;
   bits[22] = year & 4;
   bits[23] = year & 2;
   bits[24] = year & 1;
 
-  uint8_t mon_10 = xmit_datetime.mon / 10;
+  uint8_t mon_10 = datetime.mon / 10;
   bits[25] = mon_10 & 1;
 
-  uint8_t mon = xmit_datetime.mon % 10;
+  uint8_t mon = datetime.mon % 10;
   bits[26] = mon & 8;
   bits[27] = mon & 4;
   bits[28] = mon & 2;
   bits[29] = mon & 1;
 
-  uint8_t day_10 = xmit_datetime.day / 10;
+  uint8_t day_10 = datetime.day / 10;
   bits[30] = day_10 & 2;
   bits[31] = day_10 & 1;
 
-  uint8_t day = xmit_datetime.day % 10;
+  uint8_t day = datetime.day % 10;
   bits[32] = day & 8;
   bits[33] = day & 4;
   bits[34] = day & 2;
   bits[35] = day & 1;
 
-  uint8_t dow = xmit_datetime.dow;
+  uint8_t dow = datetime.dow;
   bits[36] = dow & 4;
   bits[37] = dow & 2;
   bits[38] = dow & 1;
 
-  uint8_t hour_10 = xmit_datetime.hour / 10;
+  uint8_t hour_10 = datetime.hour / 10;
   bits[39] = hour_10 & 2;
   bits[40] = hour_10 & 1;
 
-  uint8_t hour = xmit_datetime.hour % 10;
+  uint8_t hour = datetime.hour % 10;
   bits[41] = hour & 8;
   bits[42] = hour & 4;
   bits[43] = hour & 2;
   bits[44] = hour & 1;
 
-  uint8_t min_10 = xmit_datetime.min / 10;
+  uint8_t min_10 = datetime.min / 10;
   bits[45] = min_10 & 4;
   bits[46] = min_10 & 2;
   bits[47] = min_10 & 1;
 
-  uint8_t min = xmit_datetime.min % 10;
+  uint8_t min = datetime.min % 10;
   bits[48] = min & 8;
   bits[49] = min & 4;
   bits[50] = min & 2;
@@ -637,7 +644,7 @@ static void station_xmit_msf(tsig_station_t *station, int64_t utc_timestamp) {
   bits[57] = station_odd_parity(bits, 39, 52);
   bits[58] = is_xmit_bst;
 
-  char *template = station_info[TSIG_STATION_ID_MSF].xmit_template;
+  char *template = info->xmit_template;
   for (uint32_t i = 0; i < sizeof(bits); i++)
     station->xmit[i] = template[i] == '0' && bits[i] ? '1' : template[i];
 
@@ -651,8 +658,8 @@ static void station_xmit_msf(tsig_station_t *station, int64_t utc_timestamp) {
           "DUT1 %s0.%" PRIi16 ", d%" PRIu8 " of m%" PRIu8 " of y%" PRIu16
           ", weekday %" PRIu8 ", %02" PRIu8 ":%02" PRIu8 " %s, %s next hour %s",
           lt0 ? "-" : "+", dut1,
-          xmit_datetime.day, xmit_datetime.mon, xmit_datetime.year % 100,
-          dow, xmit_datetime.hour, xmit_datetime.min, tz, chg_tz, chg);
+          datetime.day, datetime.mon, datetime.year % 100,
+          dow, datetime.hour, datetime.min, tz, chg_tz, chg);
   /* clang-format on */
 
   /*
@@ -671,12 +678,13 @@ static void station_xmit_msf(tsig_station_t *station, int64_t utc_timestamp) {
   }
 }
 
-/** Compute per-minute intermediate data for WWVB. */
-static void station_xmit_wwvb(tsig_station_t *station, int64_t utc_timestamp) {
+/** Per-minute state update callback for WWVB. */
+static void station_update_wwvb(tsig_station_t *station,
+                                int64_t utc_timestamp) {
   tsig_datetime_t utc_datetime = tsig_datetime_parse_timestamp(utc_timestamp);
-
-  tsig_datetime_t datetime = tsig_datetime_parse_timestamp(
-      utc_timestamp + station_info[TSIG_STATION_ID_WWVB].utc_offset);
+  station_info_t *info = &station_info[TSIG_STATION_ID_WWVB];
+  tsig_datetime_t datetime =
+      tsig_datetime_parse_timestamp(utc_timestamp + info->utc_offset);
   uint8_t bits[60] = {
       [0] = station_sync_marker,  [9] = station_sync_marker,
       [19] = station_sync_marker, [29] = station_sync_marker,
@@ -753,7 +761,7 @@ static void station_xmit_wwvb(tsig_station_t *station, int64_t utc_timestamp) {
   bits[57] = is_dst_end;
   bits[58] = is_dst;
 
-  char *template = station_info[TSIG_STATION_ID_WWVB].xmit_template;
+  char *template = info->xmit_template;
   for (uint32_t i = 0; i < sizeof(bits); i++)
     station->xmit[i] = template[i] == '0' && bits[i] ? '1' : template[i];
 
@@ -803,7 +811,7 @@ static void station_status_write_xmit_readout(char buf[], uint8_t sec,
   *wr = '\0';
 }
 
-/** Provide a per-second status update for BPC. */
+/** Per-second status logging callback for BPC. */
 static void station_status_bpc(tsig_station_t *station, int64_t utc_timestamp) {
   station_info_t *info = &station_info[TSIG_STATION_ID_BPC];
   tsig_datetime_t datetime =
@@ -881,7 +889,7 @@ static void station_status_bpc(tsig_station_t *station, int64_t utc_timestamp) {
   tsig_log_status(4, "        %s", info->xmit_sections);
 }
 
-/** Provide a per-second status update for DCF77. */
+/** Per-second status logging callback for DCF77. */
 static void station_status_dcf77(tsig_station_t *station,
                                  int64_t utc_timestamp) {
   tsig_datetime_t utc_datetime = tsig_datetime_parse_timestamp(utc_timestamp);
@@ -936,7 +944,7 @@ static void station_status_dcf77(tsig_station_t *station,
   tsig_log_status(4, "        %s", info->xmit_sections);
 }
 
-/** Provide a per-second status update for JJY. */
+/** Per-second status logging callback for JJY. */
 static void station_status_jjy(tsig_station_t *station, int64_t utc_timestamp) {
   station_info_t *info = &station_info[TSIG_STATION_ID_JJY];
   char buf[TSIG_STATION_MESSAGE_SIZE];
@@ -986,7 +994,7 @@ static void station_status_jjy(tsig_station_t *station, int64_t utc_timestamp) {
   tsig_log_status(4, "        %s", info->xmit_sections);
 }
 
-/** Provide a per-second status update for MSF. */
+/** Per-second status logging callback for MSF. */
 static void station_status_msf(tsig_station_t *station, int64_t utc_timestamp) {
   tsig_datetime_t utc_datetime = tsig_datetime_parse_timestamp(utc_timestamp);
   station_info_t *info = &station_info[TSIG_STATION_ID_MSF];
@@ -1048,7 +1056,7 @@ static void station_status_msf(tsig_station_t *station, int64_t utc_timestamp) {
   tsig_log_status(4, "        %s", info->xmit_sections);
 }
 
-/** Provide a per-second status update for WWVB. */
+/** Per-second status logging callback for WWVB. */
 static void station_status_wwvb(tsig_station_t *station,
                                 int64_t utc_timestamp) {
   station_info_t *info = &station_info[TSIG_STATION_ID_WWVB];
@@ -1097,37 +1105,6 @@ static void station_status_wwvb(tsig_station_t *station,
   tsig_log_status(4, "        %s", info->xmit_sections);
 }
 
-/** Print transmit level flags. */
-void station_xmit_level_print(tsig_log_t *log, uint8_t xmit_level[]) {
-#ifndef TSIG_DEBUG
-  tsig_log_dbg("Transmit level flags for this minute:");
-#endif /* TSIG_DEBUG */
-  uint8_t bit = 0x01;
-  uint8_t i = 0;
-  char msg[TSIG_STATION_MESSAGE_SIZE];
-  for (uint8_t line = 0; line < 10; line++) {
-    char *wr = msg;
-    for (uint8_t sec = 0; sec < 6; sec++) {
-      if (sec)
-        *wr++ = ' ';
-      for (uint8_t dsec = 0; dsec < 10; dsec++) {
-        uint8_t b0 = xmit_level[i] & bit;
-        bit = (bit << 1) | (bit >> 7);
-        i += bit == 0x01;
-        uint8_t b1 = xmit_level[i] & bit;
-        bit = (bit << 1) | (bit >> 7);
-        i += bit == 0x01;
-        *wr++ = (!b0 && !b1)  ? '.'
-                : (!b0 && b1) ? '/'
-                : (b0 && b1)  ? '|'
-                              : '\\';
-      }
-    }
-    *wr++ = '\0';
-    tsig_log_dbg("    %s", msg);
-  }
-}
-
 /** Print station information. */
 static void station_init_print(tsig_log_t *log, tsig_station_id_t station_id,
                                int64_t base, int32_t offset, int16_t dut1,
@@ -1169,6 +1146,34 @@ static void station_init_print(tsig_log_t *log, tsig_station_id_t station_id,
 }
 
 #ifdef TSIG_DEBUG
+/** Print transmit level flags. */
+void station_xmit_level_print(tsig_log_t *log, uint8_t xmit_level[]) {
+  char msg[TSIG_STATION_MESSAGE_SIZE];
+  uint8_t bit = 0x01;
+  uint8_t i = 0;
+  for (uint8_t line = 0; line < 10; line++) {
+    char *wr = msg;
+    for (uint8_t sec = 0; sec < 6; sec++) {
+      if (sec)
+        *wr++ = ' ';
+      for (uint8_t dsec = 0; dsec < 10; dsec++) {
+        uint8_t b0 = xmit_level[i] & bit;
+        bit = (bit << 1) | (bit >> 7);
+        i += bit == 0x01;
+        uint8_t b1 = xmit_level[i] & bit;
+        bit = (bit << 1) | (bit >> 7);
+        i += bit == 0x01;
+        *wr++ = (!b0 && !b1)  ? '.'
+                : (!b0 && b1) ? '/'
+                : (b0 && b1)  ? '|'
+                              : '\\';
+      }
+    }
+    *wr++ = '\0';
+    tsig_log_dbg("    %s", msg);
+  }
+}
+
 /** Print initialized station context. */
 void station_print(tsig_station_t *station) {
   const char *station_name = tsig_station_name(station->station);
@@ -1226,14 +1231,17 @@ void station_print(tsig_station_t *station) {
  */
 void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size) {
   tsig_station_t *station = cb_data;
-  tsig_log_t *log = station->log;
 
   station_info_t *info = &station_info[station->station];
   bool is_jjy = station->station == TSIG_STATION_ID_JJY ||
                 station->station == TSIG_STATION_ID_JJY60;
-
-  uint64_t now = tsig_datetime_get_timestamp();
+  uint64_t timestamp = tsig_datetime_get_timestamp();
   uint64_t expected = station->next_timestamp;
+  char msg[TSIG_STATION_MESSAGE_SIZE];
+  tsig_log_t *log = station->log;
+  tsig_datetime_t datetime;
+  uint64_t elapsed_msecs;
+  uint64_t drift;
 
   /*
    * On first run, calculate the offset to apply to the system time such
@@ -1241,9 +1249,10 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size) {
    */
 
   if (expected == station_first_run)
-    station->base_offset = station->base != TSIG_STATION_BASE_SYSTEM
-                               ? station->base - (int64_t)now + station->offset
-                               : station->offset;
+    station->base_offset =
+        station->base != TSIG_STATION_BASE_SYSTEM
+            ? station->base - (int64_t)timestamp + station->offset
+            : station->offset;
 
   /*
    * This calculation may overflow if the time base is close to the start
@@ -1251,23 +1260,18 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size) {
    * is set (far) backward during runtime. Resolution: worksforme, wontfix~
    */
 
-  now += station->base_offset;
+  timestamp += station->base_offset;
 
   /* Resync on first run, sample rate change, or clock drift (e.g. NTP). */
-  uint64_t drift = now > expected ? now - expected : expected - now;
-
+  drift = timestamp > expected ? timestamp - expected : expected - timestamp;
   if (drift > station_drift_threshold) {
-    tsig_datetime_t datetime = tsig_datetime_parse_timestamp(now);
+    datetime = tsig_datetime_parse_timestamp(timestamp);
 
     uint32_t msecs_since_tick = datetime.msec % TSIG_STATION_MSECS_TICK;
     uint32_t msecs_to_tick = TSIG_STATION_MSECS_TICK - msecs_since_tick;
     uint32_t msecs_since_min = 1000 * datetime.sec + datetime.msec;
-    uint32_t msecs_to_min = station_msecs_min - msecs_since_min;
-    int32_t to_min = msecs_to_min * station->rate / 1000;
 
-    info->xmit_cb(station, now);
-
-    station->timestamp = now;
+    station->timestamp = timestamp;
     station->samples = 0;
     station->next_tick = msecs_to_tick * station->rate / 1000;
     station->tick = msecs_since_min / TSIG_STATION_MSECS_TICK;
@@ -1287,13 +1291,18 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size) {
      * such a crossing. The phase change shouldn't matter for other stations.
      */
 
-#ifndef TSIG_DEBUG
-    tsig_iir_init(&station->iir, station->freq, station->rate, -to_min);
-#else
-    tsig_iir_init(&station->iir, 1000, station->rate, -to_min);
+    uint32_t msecs_to_min = station_msecs_min - msecs_since_min;
+    int32_t to_min = msecs_to_min * station->rate / 1000;
+    uint32_t iir_freq = station->freq;
+
+#ifdef TSIG_DEBUG
+    iir_freq = 1000;
 #endif /* TSIG_DEBUG */
 
-    char msg[TSIG_STATION_MESSAGE_SIZE];
+    tsig_iir_init(&station->iir, iir_freq, station->rate, -to_min);
+
+    info->update_cb(station, timestamp);
+    info->status_cb(station, timestamp);
 
     /* clang-format off */
     sprintf(msg, /* "%04hu-%02hhu-%02hhu %02hhu:%02hhu:%02hhu.%03hu" */
@@ -1303,18 +1312,13 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size) {
             datetime.hour, datetime.min, datetime.sec, datetime.msec);
     /* clang-format on */
 
-    if (expected && expected != station_first_run) {
+    if (expected && expected != station_first_run)
       tsig_log_note("Resynced to %s UTC (delta %s%" PRIu64 " ms).", msg,
-                    now < expected ? "-" : "+", drift);
-    } else {
+                    timestamp < expected ? "-" : "+", drift);
+    else
       tsig_log("Synced to %s UTC.", msg);
-    }
 
-    info->xmit_status_cb(station, now);
-
-#ifndef TSIG_DEBUG
-    station_xmit_level_print(log, station->xmit_level);
-#else
+#ifdef TSIG_DEBUG
     station_print(station);
 #endif /* TSIG_DEBUG */
   }
@@ -1326,36 +1330,32 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size) {
   for (uint32_t i = 0; i < size; i++) {
     /* Update state on each tick. */
     if (station->samples == station->next_tick) {
-      uint64_t tick_timestamp =
-          station->timestamp + station->samples * 1000 / station->rate;
-      tsig_datetime_t tick_datetime =
-          tsig_datetime_parse_timestamp(tick_timestamp);
+      elapsed_msecs = station->samples * 1000 / station->rate;
+      timestamp = station->timestamp + elapsed_msecs;
+      datetime = tsig_datetime_parse_timestamp(timestamp);
 
       station->next_tick += station->samples_tick;
+      station->tick = (station->tick + 1) % TSIG_STATION_TICKS_MIN;
 
-      if (station->tick == TSIG_STATION_TICKS_MIN - 1) {
+      if (!station->tick) {
+        info->update_cb(station, timestamp);
+
         /* clang-format off */
-        tsig_log(/* "Synced at %04hu-%02hhu-%02hhu %02hhu:%02hhu UTC." */
-                 "Synced at %04" PRIu16 "-%02" PRIu8 "-%02" PRIu8
-                 " %02" PRIu8 ":%02" PRIu8 " UTC.",
-                 tick_datetime.year, tick_datetime.mon, tick_datetime.day,
-                 tick_datetime.hour, tick_datetime.min);
+        tsig_log_dbg(/* "Synced at %04hu-%02hhu-%02hhu %02hhu:%02hhu UTC." */
+                     /* e.g. "Synced at 2099-12-31 12:34 UTC." */
+                     "Synced at %04" PRIu16 "-%02" PRIu8 "-%02" PRIu8
+                     " %02" PRIu8 ":%02" PRIu8 " UTC.",
+                     datetime.year, datetime.mon, datetime.day,
+                     datetime.hour, datetime.min);
         /* clang-format on */
 
-        info->xmit_cb(station, tick_timestamp);
-        station->tick = 0;
-
-#ifndef TSIG_DEBUG
-        station_xmit_level_print(log, station->xmit_level);
-#else
+#ifdef TSIG_DEBUG
         station_print(station);
 #endif /* TSIG_DEBUG */
-      } else {
-        station->tick++;
       }
 
       if (!(station->tick % TSIG_STATION_TICKS_SEC))
-        info->xmit_status_cb(station, tick_timestamp);
+        info->status_cb(station, timestamp);
 
       /*
        * Using a public WebSDR, it was determined that if JJY is doing an
@@ -1365,8 +1365,8 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size) {
        * gain delays returning to -10 dB until the marker bit at 49 seconds.
        */
 
-      if (is_jjy && (tick_datetime.min == station_jjy_morse_min ||
-                     tick_datetime.min == station_jjy_morse_min2)) {
+      if (is_jjy && (datetime.min == station_jjy_morse_min ||
+                     datetime.min == station_jjy_morse_min2)) {
         if (station->tick == station_jjy_morse_tick)
           station->is_morse = true;
         else if (station->tick == station_jjy_morse_end_tick)
@@ -1396,7 +1396,7 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size) {
   }
 
   /* Compute the next timestamp at which this callback will be invoked. */
-  uint64_t elapsed_msecs = station->samples * 1000 / station->rate;
+  elapsed_msecs = station->samples * 1000 / station->rate;
   station->next_timestamp = station->timestamp + elapsed_msecs;
 }
 
