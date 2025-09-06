@@ -28,6 +28,9 @@ typedef struct tsig_log tsig_log_t;
 /** Our default time base is the system time. */
 #define TSIG_STATION_BASE_SYSTEM -1
 
+/** Buffer size. */
+#define TSIG_STATION_MESSAGE_SIZE 128
+
 /** Time station IDs. */
 typedef enum tsig_station_id {
   TSIG_STATION_ID_UNKNOWN = -1,
@@ -51,6 +54,12 @@ typedef struct tsig_station {
   /** Bitfield of per-tick transmit level flags for current station minute. */
   uint8_t xmit_level[TSIG_STATION_TICKS_MIN / CHAR_BIT];
 
+  /** Bit readout for current station minute (20 seconds for BPC). */
+  char xmit[TSIG_STATION_MESSAGE_SIZE];
+
+  /** Meaning of waveform for current station minute (20 seconds for BPC). */
+  char meaning[TSIG_STATION_MESSAGE_SIZE];
+
   int64_t base_offset;     /** Base timestamp offset relative to system time. */
   uint64_t timestamp;      /** Base timestamp of this station context. */
   uint64_t next_timestamp; /** Expected timestamp when next invoked. */
@@ -64,6 +73,7 @@ typedef struct tsig_station {
   uint32_t freq;  /** Target waveform frequency. */
   double gain;    /** Actual current gain in [0.0-1.0]. */
 
+  bool verbose;    /** Whether to provide verbose status updates. */
   tsig_log_t *log; /** Logging context. */
 } tsig_station_t;
 
