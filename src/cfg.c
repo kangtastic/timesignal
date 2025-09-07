@@ -76,6 +76,7 @@ static bool cfg_set_ultrasound(tsig_cfg_t *cfg, tsig_log_t *log,
 static bool cfg_set_log_file(tsig_cfg_t *cfg, tsig_log_t *log, const char *str);
 static bool cfg_set_syslog(tsig_cfg_t *cfg, tsig_log_t *log, const char *str);
 static bool cfg_set_verbose(tsig_cfg_t *cfg, tsig_log_t *log, const char *str);
+static bool cfg_set_quiet(tsig_cfg_t *cfg, tsig_log_t *log, const char *str);
 
 #ifdef TSIG_DEBUG
 static void cfg_print(tsig_cfg_t *cfg, tsig_log_t *log);
@@ -138,6 +139,7 @@ static const char cfg_help_fmt[] = {
     "  -l, --log=LOG_FILE       log messages to a file\n"
     "  -L, --syslog             log messages to syslog\n"
     "  -v, --verbose            increase logging verbosity\n"
+    "  -q, --quiet              suppress logging to console (and only console)\n"
     "\n"
     "Miscellaneous:\n"
     "  -h, --help               show this help and exit\n"
@@ -178,6 +180,7 @@ static const char cfg_longhelp_fmt[] = {
     "  log file       filesystem path\n"
     "  syslog         provide to turn on\n"
     "  verbose        provide to turn on\n"
+    "  quiet          provide to turn on\n"
     "\n"
     "Default option values:\n"
     "  time station   WWVB\n"
@@ -203,6 +206,7 @@ static const char cfg_longhelp_fmt[] = {
     "  log file       none\n"
     "  syslog         off\n"
     "  verbose        off\n"
+    "  quiet          off\n"
     "\n"
     /* clang-format on */
 };
@@ -231,6 +235,7 @@ static tsig_cfg_t cfg_default = {
     .log_file = {""},
     .syslog = false,
     .verbose = false,
+    .quiet = false,
 };
 
 /** Long options. */
@@ -258,6 +263,7 @@ static struct option cfg_longopts[] = {
     {"log", required_argument, NULL, 'l'},
     {"syslog", no_argument, NULL, 'L'},
     {"verbose", no_argument, NULL, 'v'},
+    {"quiet", no_argument, NULL, 'q'},
     {"help", no_argument, NULL, 'h'},
     {"longhelp", no_argument, NULL, 'H'},
     {NULL, 0, NULL, 0},
@@ -275,11 +281,12 @@ static const char cfg_opts[] = {
     "D:"
 #endif /* TSIG_HAVE_ALSA */
 
-    "f:r:c:SuC:l:LvhH",
+    "f:r:c:SuC:l:LvqhH",
 };
 
 /** Setter functions for a configuration file. */
 static cfg_setter_info_t cfg_setter_info[] = {
+    /* clang-format off */
     {"station", &cfg_set_station},
     {"base", &cfg_set_base},
     {"offset", &cfg_set_offset},
@@ -302,7 +309,9 @@ static cfg_setter_info_t cfg_setter_info[] = {
     {"log", &cfg_set_log_file},
     {"syslog", &cfg_set_syslog},
     {"verbose", &cfg_set_verbose},
+    {"quiet", &cfg_set_quiet},
     {NULL, NULL},
+    /* clang-format on */
 };
 
 /** Parse a string in [+-][[H]H:][[m]m:][s]s[.[S[S[S]]]] format. */
@@ -756,6 +765,20 @@ static bool cfg_set_verbose(tsig_cfg_t *cfg, tsig_log_t *log, const char *str) {
   return true;
 }
 
+/** Setter for quiet. */
+static bool cfg_set_quiet(tsig_cfg_t *cfg, tsig_log_t *log, const char *str) {
+  if (!str || !tsig_util_strcasecmp(str, "on")) {
+    cfg->quiet = true;
+  } else if (!tsig_util_strcasecmp(str, "off")) {
+    cfg->quiet = false;
+  } else {
+    tsig_log_err("Invalid quiet \"%s\" must be \"on\" or \"off\"", str);
+    return false;
+  }
+
+  return true;
+}
+
 /** Find setter function for a configuration file option name. */
 static int cfg_setter_index(char *name) {
   if (!name)
@@ -976,6 +999,7 @@ static void cfg_print(tsig_cfg_t *cfg, tsig_log_t *log) {
   tsig_log_dbg("  .log_file   = \"%s\",", cfg->log_file);
   tsig_log_dbg("  .syslog     = %d,", cfg->syslog);
   tsig_log_dbg("  .verbose    = %d,", cfg->verbose);
+  tsig_log_dbg("  .quiet      = %d,", cfg->quiet);
   tsig_log_dbg("};");
 }
 #endif /* TSIG_DEBUG */
@@ -1020,6 +1044,7 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
   bool got_log_file = false;
   bool got_syslog = false;
   bool got_verbose = false;
+  bool got_quiet = false;
 
   *cfg = cfg_default;
 
@@ -1100,6 +1125,10 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
         cfg->verbose = true;
         got_verbose = true;
         break;
+      case 'q':
+        cfg->quiet = true;
+        got_quiet = true;
+        break;
       case 'h':
         if (!help)
           help = 1;
@@ -1155,6 +1184,8 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
     cfg->syslog = cfg_file.syslog;
   if (!got_verbose)
     cfg->verbose = cfg_file.verbose;
+  if (!got_quiet)
+    cfg->quiet = cfg_file.quiet;
 
   if (!is_ok || help > 1) {
     fprintf(stderr, cfg_help_fmt);
@@ -1162,7 +1193,8 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
   } else if (help) {
     fprintf(stderr, cfg_help_fmt);
   } else {
-    tsig_log_finish_init(log, cfg->log_file, cfg->syslog, cfg->verbose);
+    tsig_log_finish_init(log, cfg->log_file, cfg->syslog, cfg->verbose,
+                         cfg->quiet);
   }
 
 #ifdef TSIG_DEBUG

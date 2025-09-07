@@ -249,11 +249,15 @@ void tsig_log_init(tsig_log_t *log) {
  * @param log_file Log file. Will emit logs to it if not NULL.
  * @param syslog Whether to emit logs to syslog.
  * @param verbose Whether to emit verbose logs.
+ * @param quiet Whether to emit no logs to console.
  */
 void tsig_log_finish_init(tsig_log_t *log, char log_file[], bool syslog,
-                          bool verbose) {
+                          bool verbose, bool quiet) {
   if (verbose)
     log->level = LOG_DEBUG;
+
+  if (quiet)
+    log->console = false;
 
   if (syslog) {
     openlog(TSIG_DEFAULTS_NAME, LOG_PID, LOG_USER);

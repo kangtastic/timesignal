@@ -61,6 +61,7 @@ typedef struct tsig_cfg {
   char log_file[TSIG_CFG_PATH_SIZE]; /** Path to log file. */
   bool syslog;                       /** Whether to log to syslog. */
   bool verbose;                      /** Whether to be verbose. */
+  bool quiet;                        /** Whether to log nothing to console. */
 } tsig_cfg_t;
 
 tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,

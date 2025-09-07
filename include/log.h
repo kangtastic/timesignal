@@ -83,7 +83,7 @@ typedef struct tsig_log {
 
 void tsig_log_init(tsig_log_t *log);
 void tsig_log_finish_init(tsig_log_t *log, char log_file[], bool syslog,
-                          bool verbose);
+                          bool verbose, bool quiet);
 void tsig_log_msg(tsig_log_t *log, int level, const char *src_file,
                   int src_line, const char *fmt, ...);
 void tsig_log_msg_tty(tsig_log_t *log, int status_line, const char *src_file,
