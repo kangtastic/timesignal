@@ -141,8 +141,15 @@ static const char cfg_help_fmt[] = {
     "\n"
     "Miscellaneous:\n"
     "  -h, --help               show this help and exit\n"
+    "  -H, --longhelp           also show allowed and default option values\n"
     "\n"
-    "Recognized option values (not all work on all systems):\n"
+    /* clang-format on */
+};
+
+/** Long help string. */
+static const char cfg_longhelp_fmt[] = {
+    /* clang-format off */
+    "Allowed option values (not all work on all systems):\n"
     "  time station   BPC, DCF77, JJY, JJY60, MSF, WWVB\n"
     "  time base      1970-01-01 00:00:00+0000 to 9999-12-31 23:59:59+2359\n"
     "  user offset    -23:59:59.999 to 23:59:59.999\n"
@@ -252,6 +259,7 @@ static struct option cfg_longopts[] = {
     {"syslog", no_argument, NULL, 'L'},
     {"verbose", no_argument, NULL, 'v'},
     {"help", no_argument, NULL, 'h'},
+    {"longhelp", no_argument, NULL, 'H'},
     {NULL, 0, NULL, 0},
 };
 
@@ -267,7 +275,7 @@ static const char cfg_opts[] = {
     "D:"
 #endif /* TSIG_HAVE_ALSA */
 
-    "f:r:c:SuC:l:Lvh",
+    "f:r:c:SuC:l:LvhH",
 };
 
 /** Setter functions for a configuration file. */
@@ -987,7 +995,7 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
   const char *cfg_file_path = TSIG_DEFAULTS_CFG_FILE;
   tsig_cfg_t cfg_file = cfg_default;
   bool is_ok = true;
-  bool help = false;
+  int help = 0;
   int opt;
 
   bool got_station = false;
@@ -1093,7 +1101,11 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
         got_verbose = true;
         break;
       case 'h':
-        help = true;
+        if (!help)
+          help = 1;
+        break;
+      case 'H':
+        help = 2;
         break;
       default:
         is_ok = false;
@@ -1144,10 +1156,14 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
   if (!got_verbose)
     cfg->verbose = cfg_file.verbose;
 
-  if (help || !is_ok)
-    tsig_cfg_help();
-  else
+  if (!is_ok || help > 1) {
+    fprintf(stderr, cfg_help_fmt);
+    fprintf(stderr, cfg_longhelp_fmt);
+  } else if (help) {
+    fprintf(stderr, cfg_help_fmt);
+  } else {
     tsig_log_finish_init(log, cfg->log_file, cfg->syslog, cfg->verbose);
+  }
 
 #ifdef TSIG_DEBUG
   cfg_print(&cfg_file, log);
@@ -1157,9 +1173,4 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
   return !is_ok ? TSIG_CFG_INIT_FAIL
          : help ? TSIG_CFG_INIT_HELP
                 : TSIG_CFG_INIT_OK;
-}
-
-/** Print help message to stderr. */
-void tsig_cfg_help(void) {
-  fprintf(stderr, cfg_help_fmt);
 }

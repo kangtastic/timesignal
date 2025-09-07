@@ -65,4 +65,3 @@ typedef struct tsig_cfg {
 
 tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
                                      char *argv[]);
-void tsig_cfg_help(void);
