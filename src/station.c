@@ -43,6 +43,9 @@ static const uint8_t station_sync_marker = 0xff;
 /* Subharmonic selection. */
 static const uint32_t station_ultrasound_threshold = 20000;
 
+/* Arbitrary audible frequency. */
+static const uint32_t station_audible_freq = 1000;
+
 /*
  * JJY makes announcements during minutes 15 and 45. From about
  * [40.550-49.000) seconds, it transmits its callsign in Morse code.
@@ -1103,13 +1106,15 @@ static void station_status_wwvb(tsig_station_t *station,
 
   /* e.g. "        minute    hour       day of year     dut1       year       flags" */
   tsig_log_status(4, "        %s", info->xmit_sections);
+
+  tsig_log_status_print();
 }
 
 /** Print station information. */
 static void station_init_print(tsig_log_t *log, tsig_station_id_t station_id,
                                int64_t base, int32_t offset, int16_t dut1,
-                               bool smooth, bool ultrasound, uint32_t freq,
-                               uint32_t subharmonic) {
+                               bool smooth, bool ultrasound, bool audible,
+                               uint32_t freq, uint32_t subharmonic) {
   const char *sign = offset < 0 ? "-" : "";
   int32_t coeff = offset < 0 ? -1 : 1;
   char msg[TSIG_STATION_MESSAGE_SIZE];
@@ -1143,6 +1148,10 @@ static void station_init_print(tsig_log_t *log, tsig_station_id_t station_id,
                " (subharmonic %" PRIu32 " of %" PRIu32 " Hz).",
                freq / subharmonic, subharmonic, freq);
   /* clang-format on */
+
+  if (audible)
+    tsig_log_note(
+        "Output will be audible and will not actually set a clock. Enjoy!");
 }
 
 #ifdef TSIG_DEBUG
@@ -1184,6 +1193,7 @@ void station_print(tsig_station_t *station) {
   tsig_log_dbg("  .offset         = %" PRIi32 ",", station->offset);
   tsig_log_dbg("  .dut1           = %" PRIi16 ",", station->dut1);
   tsig_log_dbg("  .smooth         = %d,", station->smooth);
+  tsig_log_dbg("  .audible        = %d,", station->audible);
   tsig_log_dbg("  .rate           = %" PRIu32 ",", station->rate);
   tsig_log_dbg("  .xmit_level     = {");
   station_xmit_level_print(log, station->xmit_level);
@@ -1291,14 +1301,9 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size) {
      * such a crossing. The phase change shouldn't matter for other stations.
      */
 
+    uint32_t iir_freq = station->audible ? station_audible_freq : station->freq;
     uint32_t msecs_to_min = station_msecs_min - msecs_since_min;
     int32_t to_min = msecs_to_min * station->rate / 1000;
-    uint32_t iir_freq = station->freq;
-
-#ifdef TSIG_DEBUG
-    iir_freq = 1000;
-#endif /* TSIG_DEBUG */
-
     tsig_iir_init(&station->iir, iir_freq, station->rate, -to_min);
 
     info->update_cb(station, timestamp);
@@ -1414,6 +1419,7 @@ void tsig_station_init(tsig_station_t *station, tsig_cfg_t *cfg,
   tsig_station_id_t station_id = cfg->station;
   bool ultrasound = cfg->ultrasound;
   int32_t offset = cfg->offset;
+  bool audible = cfg->audible;
   bool verbose = cfg->verbose;
   uint32_t rate = cfg->rate;
   bool smooth = cfg->smooth;
@@ -1451,6 +1457,7 @@ void tsig_station_init(tsig_station_t *station, tsig_cfg_t *cfg,
       .offset = offset,
       .dut1 = dut1,
       .smooth = smooth,
+      .audible = audible,
       .rate = rate,
       .xmit_level = {0},
       .xmit = {""},
@@ -1463,7 +1470,7 @@ void tsig_station_init(tsig_station_t *station, tsig_cfg_t *cfg,
   };
 
   station_init_print(log, station_id, base, offset, dut1, smooth, ultrasound,
-                     freq, subharmonic);
+                     audible, freq, subharmonic);
 }
 
 /**

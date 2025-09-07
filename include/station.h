@@ -49,6 +49,7 @@ typedef struct tsig_station {
   int32_t offset;            /** User offset in milliseconds. */
   int16_t dut1;              /** DUT1 value in milliseconds. */
   bool smooth;               /** Whether to interpolate rapid gain changes. */
+  bool audible;              /** Whether to make waveform audible. */
   uint32_t rate;             /** Sample rate. */
 
   /** Bitfield of per-tick transmit level flags for current station minute. */

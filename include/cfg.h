@@ -56,6 +56,7 @@ typedef struct tsig_cfg {
   uint16_t channels;          /** Channel count. */
   bool smooth;                /** Whether to interpolate rapid gain changes. */
   bool ultrasound;            /** Whether to allow ultrasound output. */
+  bool audible;               /** Whether to make output waveform audible. */
   /* clang-format on */
 
   char log_file[TSIG_CFG_PATH_SIZE]; /** Path to log file. */

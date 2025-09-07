@@ -73,6 +73,7 @@ static bool cfg_set_channels(tsig_cfg_t *cfg, tsig_log_t *log, const char *str);
 static bool cfg_set_smooth(tsig_cfg_t *cfg, tsig_log_t *log, const char *str);
 static bool cfg_set_ultrasound(tsig_cfg_t *cfg, tsig_log_t *log,
                                const char *str);
+static bool cfg_set_audible(tsig_cfg_t *cfg, tsig_log_t *log, const char *str);
 static bool cfg_set_log_file(tsig_cfg_t *cfg, tsig_log_t *log, const char *str);
 static bool cfg_set_syslog(tsig_cfg_t *cfg, tsig_log_t *log, const char *str);
 static bool cfg_set_verbose(tsig_cfg_t *cfg, tsig_log_t *log, const char *str);
@@ -131,6 +132,7 @@ static const char cfg_help_fmt[] = {
     "  -c, --channels=CHANNELS  output channels\n"
     "  -S, --smooth             smooth rapid gain changes in output waveform\n"
     "  -u, --ultrasound         enable ultrasound output (MAY DAMAGE EQUIPMENT)\n"
+    "  -a, --audible            make output waveform audible (for entertainment only)\n"
     "\n"
     "Configuration file options:\n"
     "  -C, --config=CONFIG_FILE load options from a file\n"
@@ -176,6 +178,7 @@ static const char cfg_longhelp_fmt[] = {
     "  channels       1-1023\n"
     "  smooth gain    provide to turn on\n"
     "  ultrasound     provide to turn on (MAY DAMAGE EQUIPMENT)\n"
+    "  audible        provide to turn on (for entertainment only)\n"
     "  config file    filesystem path\n"
     "  log file       filesystem path\n"
     "  syslog         provide to turn on\n"
@@ -202,6 +205,7 @@ static const char cfg_longhelp_fmt[] = {
     "  channels       1\n"
     "  smooth gain    off\n"
     "  ultrasound     off\n"
+    "  audible        off\n"
     "  config file    none\n"
     "  log file       none\n"
     "  syslog         off\n"
@@ -232,6 +236,7 @@ static tsig_cfg_t cfg_default = {
     .channels = 1,
     .smooth = false,
     .ultrasound = false,
+    .audible = false,
     .log_file = {""},
     .syslog = false,
     .verbose = false,
@@ -259,6 +264,7 @@ static struct option cfg_longopts[] = {
     {"channels", required_argument, NULL, 'c'},
     {"smooth", no_argument, NULL, 'S'},
     {"ultrasound", no_argument, NULL, 'u'},
+    {"audible", no_argument, NULL, 'a'},
     {"config", required_argument, NULL, 'C'},
     {"log", required_argument, NULL, 'l'},
     {"syslog", no_argument, NULL, 'L'},
@@ -281,7 +287,7 @@ static const char cfg_opts[] = {
     "D:"
 #endif /* TSIG_HAVE_ALSA */
 
-    "f:r:c:SuC:l:LvqhH",
+    "f:r:c:SuaC:l:LvqhH",
 };
 
 /** Setter functions for a configuration file. */
@@ -306,6 +312,7 @@ static cfg_setter_info_t cfg_setter_info[] = {
     {"channels", &cfg_set_channels},
     {"smooth", &cfg_set_smooth},
     {"ultrasound", &cfg_set_ultrasound},
+    {"audible", &cfg_set_audible},
     {"log", &cfg_set_log_file},
     {"syslog", &cfg_set_syslog},
     {"verbose", &cfg_set_verbose},
@@ -726,6 +733,20 @@ static bool cfg_set_ultrasound(tsig_cfg_t *cfg, tsig_log_t *log,
   return true;
 }
 
+/** Setter for audible. */
+static bool cfg_set_audible(tsig_cfg_t *cfg, tsig_log_t *log, const char *str) {
+  if (!str || !tsig_util_strcasecmp(str, "on")) {
+    cfg->audible = true;
+  } else if (!tsig_util_strcasecmp(str, "off")) {
+    cfg->audible = false;
+  } else {
+    tsig_log_err("Invalid audible \"%s\" must be \"on\" or \"off\"", str);
+    return false;
+  }
+
+  return true;
+}
+
 /** Setter for log_file. */
 static bool cfg_set_log_file(tsig_cfg_t *cfg, tsig_log_t *log,
                              const char *str) {
@@ -996,6 +1017,7 @@ static void cfg_print(tsig_cfg_t *cfg, tsig_log_t *log) {
   tsig_log_dbg("  .channels   = %" PRIu16 ",", cfg->channels);
   tsig_log_dbg("  .smooth     = %d,", cfg->smooth);
   tsig_log_dbg("  .ultrasound = %d,", cfg->ultrasound);
+  tsig_log_dbg("  .audible    = %d,", cfg->audible);
   tsig_log_dbg("  .log_file   = \"%s\",", cfg->log_file);
   tsig_log_dbg("  .syslog     = %d,", cfg->syslog);
   tsig_log_dbg("  .verbose    = %d,", cfg->verbose);
@@ -1041,6 +1063,7 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
   bool got_channels = false;
   bool got_smooth = false;
   bool got_ultrasound = false;
+  bool got_audible = false;
   bool got_log_file = false;
   bool got_syslog = false;
   bool got_verbose = false;
@@ -1110,6 +1133,10 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
         cfg->ultrasound = true;
         got_ultrasound = true;
         break;
+      case 'a':
+        cfg->audible = true;
+        got_audible = true;
+        break;
       case 'C':
         cfg_file_path = optarg;
         break;
@@ -1178,6 +1205,8 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
     cfg->smooth = cfg_file.smooth;
   if (!got_ultrasound)
     cfg->ultrasound = cfg_file.ultrasound;
+  if (!got_audible)
+    cfg->audible = cfg_file.audible;
   if (!got_log_file)
     strcpy(cfg->log_file, cfg_file.log_file);
   if (!got_syslog)
