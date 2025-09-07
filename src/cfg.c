@@ -137,10 +137,10 @@ static const char cfg_help_fmt[] = {
     "Logging options:\n"
     "  -l, --log=LOG_FILE       log messages to a file\n"
     "  -L, --syslog             log messages to syslog\n"
+    "  -v, --verbose            increase logging verbosity\n"
     "\n"
     "Miscellaneous:\n"
     "  -h, --help               show this help and exit\n"
-    "  -v, --verbose            increase verbosity\n"
     "\n"
     "Recognized option values (not all work on all systems):\n"
     "  time station   BPC, DCF77, JJY, JJY60, MSF, WWVB\n"
@@ -250,8 +250,8 @@ static struct option cfg_longopts[] = {
     {"config", required_argument, NULL, 'C'},
     {"log", required_argument, NULL, 'l'},
     {"syslog", no_argument, NULL, 'L'},
-    {"help", no_argument, NULL, 'h'},
     {"verbose", no_argument, NULL, 'v'},
+    {"help", no_argument, NULL, 'h'},
     {NULL, 0, NULL, 0},
 };
 
@@ -267,7 +267,7 @@ static const char cfg_opts[] = {
     "D:"
 #endif /* TSIG_HAVE_ALSA */
 
-    "f:r:c:SuC:l:Lhv",
+    "f:r:c:SuC:l:Lvh",
 };
 
 /** Setter functions for a configuration file. */
@@ -1088,12 +1088,12 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
         cfg->syslog = true;
         got_syslog = true;
         break;
-      case 'h':
-        help = true;
-        break;
       case 'v':
         cfg->verbose = true;
         got_verbose = true;
+        break;
+      case 'h':
+        help = true;
         break;
       default:
         is_ok = false;
