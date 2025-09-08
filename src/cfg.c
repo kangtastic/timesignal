@@ -106,7 +106,7 @@ static const char cfg_help_fmt[] = {
     TSIG_DEFAULTS_NAME " " TSIG_DEFAULTS_VERSION " <" TSIG_DEFAULTS_URL ">\n"
     TSIG_DEFAULTS_DESCRIPTION "\n"
     "\n"
-    "Usage: " TSIG_DEFAULTS_NAME " [OPTION]...\n"
+    "Usage: %s [OPTION]...\n"
     "\n"
     "Time signal options:\n"
     "  -s, --station=STATION    time station to emulate\n"
@@ -1040,6 +1040,7 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
                                      char *argv[]) {
   const char *cfg_file_path = TSIG_DEFAULTS_CFG_FILE;
   tsig_cfg_t cfg_file = cfg_default;
+  char progname[PATH_MAX];
   bool is_ok = true;
   int help = 0;
   int opt;
@@ -1216,11 +1217,13 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
   if (!got_quiet)
     cfg->quiet = cfg_file.quiet;
 
+  tsig_util_getprogname(progname);
+
   if (!is_ok || help > 1) {
-    fprintf(stderr, cfg_help_fmt);
+    fprintf(stderr, cfg_help_fmt, progname);
     fprintf(stderr, cfg_longhelp_fmt);
   } else if (help) {
-    fprintf(stderr, cfg_help_fmt);
+    fprintf(stderr, cfg_help_fmt, progname);
   } else {
     tsig_log_finish_init(log, cfg->log_file, cfg->syslog, cfg->verbose,
                          cfg->quiet);

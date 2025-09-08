@@ -7,4 +7,5 @@
  * Copyright © 2025 James Seo <james@equiv.tech>
  */
 
+void tsig_util_getprogname(char progname[]);
 int tsig_util_strcasecmp(const char *s1, const char *s2);

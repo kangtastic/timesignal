@@ -9,6 +9,49 @@
 
 #include "util.h"
 
+#include "defaults.h"
+
+#include <libgen.h>
+
+#include <stdlib.h>
+
+/**
+ * Find the name of the program during runtime.
+ *
+ * Should give similar results to BSD's getprogname(3), glibc's
+ * program_invocation_name(3), or the usual argv[0] trickery.
+ *
+ * @param[out] progname Output buffer at least PATH_MAX in size.
+ */
+void tsig_util_getprogname(char progname[]) {
+  char *name = TSIG_DEFAULTS_NAME;
+  char *tmp;
+  char *wr;
+
+  /*
+   * Program name is basename(realpath(<exe name>)). Caveats:
+   *
+   *  - realpath(3) returns NULL if its result cannot fit in PATH_MAX.
+   *  - The version of basename(3) we're using is the POSIX version from
+   *    <libgen.h>, so it may return "/", it may modify its argument, and
+   *    its return value may be either a static buffer or inside its argument.
+   *  - strcpy(3) doesn't like copying within the same buffer.
+   */
+
+  if (realpath("/proc/self/exe", progname)) {
+    tmp = basename(progname);
+    if (*tmp && *tmp != '/' && *tmp != '.')
+      name = tmp;
+  }
+
+  wr = progname;
+
+  while (*name)
+    *wr++ = *name++;
+
+  *wr = '\0';
+}
+
 /**
  * Compare strings, ignoring differences in case.
  *
