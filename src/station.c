@@ -1364,12 +1364,13 @@ void tsig_station_cb(void *cb_data, double *out_cb_buf, uint32_t size) {
         info->update_cb(station, timestamp);
 
         /* clang-format off */
-        tsig_log_dbg(/* "Synced at %04hu-%02hhu-%02hhu %02hhu:%02hhu UTC." */
-                     /* e.g. "Synced at 2099-12-31 12:34 UTC." */
-                     "Synced at %04" PRIu16 "-%02" PRIu8 "-%02" PRIu8
-                     " %02" PRIu8 ":%02" PRIu8 " UTC.",
-                     datetime.year, datetime.mon, datetime.day,
-                     datetime.hour, datetime.min);
+        if (!datetime.min)
+          tsig_log_dbg(/* "Synced at %04hu-%02hhu-%02hhu %02hhu:%02hhu UTC." */
+                      /* e.g. "Synced at 2099-12-31 12:34 UTC." */
+                      "Synced at %04" PRIu16 "-%02" PRIu8 "-%02" PRIu8
+                      " %02" PRIu8 ":%02" PRIu8 " UTC.",
+                      datetime.year, datetime.mon, datetime.day,
+                      datetime.hour, datetime.min);
         /* clang-format on */
 
 #ifdef TSIG_DEBUG
