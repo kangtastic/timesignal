@@ -41,7 +41,12 @@ BUILDDIR          := build
 SRCDIR            := src
 INCDIR            := include
 
-CC                := gcc
+CC                ?= gcc
+STRIP             ?= strip
+
+CROSS_COMPILE     ?=
+CC                := $(CROSS_COMPILE)$(CC)
+STRIP             := $(CROSS_COMPILE)$(STRIP)
 
 CFLAGS            ?= -O2 -fstack-protector-strong -Wall -Wextra -Wformat -Werror=format-security -fPIE -std=gnu11
 CFLAGS            += -I$(INCDIR)
@@ -96,6 +101,9 @@ $(BUILDDIR)/%.o:  $(SRCDIR)/%.c | $(BUILDDIR)
 $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
 
+strip:            $(TARGET)
+	$(STRIP) --strip-unneeded $(TARGET)
+
 clean:
 	rm -rf $(BUILDDIR) $(TARGET)
 
@@ -106,4 +114,4 @@ install:          $(TARGET)
 uninstall:
 	rm -f $(DESTDIR)$(SBIN)/$(TARGET)
 
-.PHONY:           all debug clean install uninstall
+.PHONY:           all debug strip clean install uninstall
