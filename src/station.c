@@ -862,8 +862,10 @@ static void station_status_bpc(tsig_station_t *station, int64_t utc_timestamp) {
     sprintf(cur, "%s%c%c%s", inverse, xmit[xi], xmit[xj], reset);
   tsig_log_status(1, "BPC     %s, transmitting %s", buf, cur);
 
-  if (!station->verbose)
+  if (!station->verbose) {
+    tsig_log_status_print();
     return;
+  }
 
   /* e.g. "meaning 00:34:00 PM, weekday 4, day 31 of month 12 of year 99" */
   tsig_log_status(2, "meaning %s", meaning);
@@ -890,6 +892,8 @@ static void station_status_bpc(tsig_station_t *station, int64_t utc_timestamp) {
 
   /* e.g. "        secs hour   minute dow  pm dom    mon  year" */
   tsig_log_status(4, "        %s", info->xmit_sections);
+
+  tsig_log_status_print();
 }
 
 /** Per-second status logging callback for DCF77. */
@@ -933,8 +937,10 @@ static void station_status_dcf77(tsig_station_t *station,
     sprintf(cur, "%s%c%s", inverse, xmit[sec], reset);
   tsig_log_status(1, "DCF77   %s, transmitting %s", buf, cur);
 
-  if (!station->verbose)
+  if (!station->verbose) {
+    tsig_log_status_print();
     return;
+  }
 
   /* e.g. "meaning 12:34 CET, CEST next min no, weekday 4, day 31 of month 12 of year 99" */
   tsig_log_status(2, "meaning %s", station->meaning);
@@ -945,6 +951,8 @@ static void station_status_dcf77(tsig_station_t *station,
 
   /* e.g. "        civil warning   flags minute    hour    dom    dow month year" */
   tsig_log_status(4, "        %s", info->xmit_sections);
+
+  tsig_log_status_print();
 }
 
 /** Per-second status logging callback for JJY. */
@@ -983,8 +991,10 @@ static void station_status_jjy(tsig_station_t *station, int64_t utc_timestamp) {
     sprintf(cur, "%s%c%s", inverse, xmit[sec], reset);
   tsig_log_status(1, "%-8s%s, transmitting %s", callsign, buf, cur);
 
-  if (!station->verbose)
+  if (!station->verbose) {
+    tsig_log_status_print();
     return;
+  }
 
   /* e.g. "meaning 12:34, day 365 of year 99, weekday 4, leapsec end mon +0" */
   tsig_log_status(2, "meaning %s", station->meaning);
@@ -995,6 +1005,8 @@ static void station_status_jjy(tsig_station_t *station, int64_t utc_timestamp) {
 
   /* e.g. "        minute    hour       day of year     parity  year     dow  leapsec" */
   tsig_log_status(4, "        %s", info->xmit_sections);
+
+  tsig_log_status_print();
 }
 
 /** Per-second status logging callback for MSF. */
@@ -1045,8 +1057,10 @@ static void station_status_msf(tsig_station_t *station, int64_t utc_timestamp) {
     sprintf(cur, "00");
   tsig_log_status(1, "MSF     %s, transmitting %s", buf, cur);
 
-  if (!station->verbose)
+  if (!station->verbose) {
+    tsig_log_status_print();
     return;
+  }
 
   /* e.g. "meaning DUT1 +0.0, d31 of m12 of y99, weekday 4, 12:34 GMT, BST next hour no" */
   tsig_log_status(2, "meaning %s", station->meaning);
@@ -1057,6 +1071,8 @@ static void station_status_msf(tsig_station_t *station, int64_t utc_timestamp) {
 
   /* e.g. "        dut1              year     month dom    dow hour   minute  minmark" */
   tsig_log_status(4, "        %s", info->xmit_sections);
+
+  tsig_log_status_print();
 }
 
 /** Per-second status logging callback for WWVB. */
@@ -1094,8 +1110,10 @@ static void station_status_wwvb(tsig_station_t *station,
     sprintf(cur, "%s%c%s", inverse, xmit[sec], reset);
   tsig_log_status(1, "WWVB    %s, transmitting %s", buf, cur);
 
-  if (!station->verbose)
+  if (!station->verbose) {
+    tsig_log_status_print();
     return;
+  }
 
   /* e.g. "meaning 12:34, day 365 of year 99, DUT1 +0.0, leap year no, DST no" */
   tsig_log_status(2, "meaning %s", station->meaning);

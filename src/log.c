@@ -30,7 +30,6 @@
 #define TSIG_LOG_SRC_INFO_MIN_WIDTH 10
 
 /** Escape strings and escape format strings. */
-static const char *log_esc_line_move_up_fmt = "\x1b[%dA";
 static const char *log_esc_line_scroll_up = "\x1bM";
 static const char *log_esc_line_clear = "\x1b[2K";
 
@@ -66,6 +65,7 @@ static tsig_log_t log_default = {
     .syslog = false,
     .have_status = false,
     .status_lines = 0,
+    .status_lines_disp = 0,
     .status_line = {{""}},
 };
 
@@ -117,6 +117,50 @@ static int log_status_line_write_msg(char buf[], int len, const char *src_file,
   return len;
 }
 
+/**
+ * Clear the TTY-only status area.
+ *
+ * This is a separate step from writing the status area so that regular
+ * log messages can be inserted above the status area by log_msg_console().
+ */
+static void log_status_clear(tsig_log_t *log) {
+  /*
+   * (stdout and stderr were merged; the output file will always be stdout.)
+   *
+   * e.g. not status area        ->  not status area
+   *                                 <cursor>
+   *      status line n
+   *      status line 1
+   *      <cursor>
+   */
+
+  if (log->status_lines_disp)
+    for (int line = 0; line <= log->status_lines_disp; line++)
+      fprintf(stdout, "%s\r%s", log_esc_line_clear, log_esc_line_scroll_up);
+}
+
+/** Write the TTY-only status area. */
+static void log_status_write(tsig_log_t *log) {
+  /*
+   * (stdout and stderr were merged; the output file will always be stdout.)
+   *
+   * e.g. not status area        ->  not status area
+   *      <cursor>
+   *                                 status line n
+   *                                 status line 1
+   *                                 <cursor>
+   */
+
+  if (log->status_lines) {
+    fprintf(stdout, "%s", "\n");
+    for (int line = log->status_lines; line; line--)
+      fprintf(stdout, "%s\n", log->status_line[line - 1]);
+    fflush(stdout);
+  }
+
+  log->status_lines_disp = log->status_lines;
+}
+
 /** Write a timestamp to a file. */
 static void log_write_timestamp(FILE *file) {
   char timestamp[TSIG_LOG_TIMESTAMP_SIZE];
@@ -166,30 +210,20 @@ static void log_msg_console(tsig_log_t *log, int level, const char *src_file,
   /*
    * If the status area is enabled and present, write the message to the
    * gap before the status area, then rewrite the gap and the status area.
-   * (stdout and stderr were merged; the output file will always be stdout.)
    *
    * e.g. not status area        ->  not status area
    *                                 not status area (this message)
    *      status line n
-   *      status line 1<cursor>      status line n
-   *                                 status line 1<cursor>
+   *      status line 1              status line n
+   *      <cursor>                   status line 1
+   *                                 <cursor>
+   *
+   * Otherwise, log_status_clear() and log_status_write() are effectively noops.
    */
 
-  if (log->status_lines) {
-    fprintf(stdout, log_esc_line_move_up_fmt, log->status_lines);
-    fprintf(stdout, "%s", "\r");
-  }
-
+  log_status_clear(log);
   log_write_msg(file, src_file, src_line, desc, fmt, params);
-
-  /* Reconstruct status area if necessary. */
-  if (log->status_lines) {
-    fprintf(stdout, "%s\r", log_esc_line_clear);
-    for (int line = log->status_lines; line; line--)
-      fprintf(stdout, "\n%s\r%s", log_esc_line_clear,
-              log->status_line[line - 1]);
-    fflush(stdout);
-  }
+  log_status_write(log);
 }
 
 #ifdef TSIG_DEBUG
@@ -329,32 +363,40 @@ __attribute__((format(printf, 5, 6))) void tsig_log_msg(tsig_log_t *log,
 /**
  * Log a message to a TTY only.
  *
- * @note Direct use skips safety checks; use via a logging macro instead.
+ * @note Direct use skips safety checks; use via the tsig_log_tty macro instead.
  *
  * @param log Initialized logging context.
- * @param status_line Status line number, or 0 if not a status line.
  * @param src_file Source file name, ordinarily NULL.
  * @param src_line Source line number, ordinarily 0.
  * @param fmt Format string.
  */
-__attribute__((format(printf, 5, 6))) void tsig_log_msg_tty(
+__attribute__((format(printf, 4, 5))) void tsig_log_msg_tty(
+    tsig_log_t *log, const char *src_file, int src_line, const char *fmt, ...) {
+  va_list params;
+
+  va_start(params, fmt);
+  log_msg_console(log, LOG_INFO, src_file, src_line, fmt, params);
+  va_end(params);
+}
+
+/**
+ * Set a line in the TTY-only status area.
+ *
+ * @note Direct use skips safety checks;
+ *  use via the tsig_log_status macro instead.
+ *
+ * @param log Initialized logging context.
+ * @param status_line Status line number.
+ * @param src_file Source file name, ordinarily NULL.
+ * @param src_line Source line number, ordinarily 0.
+ * @param fmt Format string.
+ */
+__attribute__((format(printf, 5, 6))) void tsig_log_status_impl(
     tsig_log_t *log, int status_line, const char *src_file, int src_line,
     const char *fmt, ...) {
   va_list params;
   char *buf;
   int len;
-
-  /* Log level is always LOG_INFO, output file is always stdout. */
-  if (!log->is_stdout_tty)
-    return;
-
-  /* If not a status line, log message as usual and exit. */
-  if (!status_line) {
-    va_start(params, fmt);
-    log_msg_console(log, LOG_INFO, src_file, src_line, fmt, params);
-    va_end(params);
-    return;
-  }
 
   /* Write the status line to the corresponding buffer. */
   va_start(params, fmt);
@@ -362,7 +404,7 @@ __attribute__((format(printf, 5, 6))) void tsig_log_msg_tty(
   len = log_status_line_write_msg(buf, 0, src_file, src_line, fmt, params);
   va_end(params);
 
-  /* Truncate the line if it is too long (unlikely). */
+  /* Truncate the status line if it is too long (unlikely). */
   if (len > TSIG_LOG_STATUS_LINE_SIZE - 1) {
     buf[TSIG_LOG_STATUS_LINE_SIZE - 4] = '.';
     buf[TSIG_LOG_STATUS_LINE_SIZE - 3] = '.';
@@ -370,26 +412,36 @@ __attribute__((format(printf, 5, 6))) void tsig_log_msg_tty(
     buf[TSIG_LOG_STATUS_LINE_SIZE - 1] = '\0';
   }
 
+  if (log->status_lines < status_line)
+    log->status_lines = status_line;
+}
+
+/**
+ * Print the TTY-only status area.
+ *
+ * @note Direct use skips safety checks;
+ *  use via the tsig_log_status_print macro instead.
+ *
+ * @param log Initialized logging context.
+ */
+void tsig_log_status_print_impl(tsig_log_t *log) {
   /*
-   * Write the status area, separated between normal messages by a gap.
-   * (stdout and stderr were merged; the output file will always be stdout.)
+   * The status area is separated between normal messages by a gap.
    *
    * e.g. not status area        ->  not status area
    *      <cursor>
-   *                                 status line n
-   *                                 status line 1<cursor>
+   *                                 status line 1
+   *                                 <cursor>
+   *
+   * e.g. not status area        ->  not status area
+   *
+   *      status line 1              status line n
+   *      <cursor>                   status line 1
+   *                                 <cursor>
    */
 
-  for (; log->status_lines < status_line; log->status_lines++)
-    fprintf(stdout, "%s", "\n");
-
-  fprintf(stdout, log_esc_line_move_up_fmt, log->status_lines);
-  fprintf(stdout, "%s", "\r");
-
-  for (int line = log->status_lines; line; line--)
-    fprintf(stdout, "\n%s\r%s", log_esc_line_clear, log->status_line[line - 1]);
-
-  fflush(stdout);
+  log_status_clear(log);
+  log_status_write(log);
 }
 
 /**
@@ -401,22 +453,7 @@ void tsig_log_deinit(tsig_log_t *log) {
   if (log->log_file)
     fclose(log->log_file);
 
-  /*
-   * If the status area is enabled and present, clear the status area
-   * and place the cursor at the first column of the gap before it.
-   * (stdout and stderr were merged; the output file will always be stdout.)
-   *
-   * e.g. not status area        ->  not status area
-   *                                 <cursor>
-   *      status line n
-   *      status line 1<cursor>
-   */
-
-  if (log->status_lines) {
-    for (int line = log->status_lines; line > 0; line--)
-      fprintf(stdout, "%s\r%s", log_esc_line_clear, log_esc_line_scroll_up);
-    fflush(stdout);
-  }
+  log_status_clear(log);
 }
 
 /** Enable TTY echo. */

@@ -43,26 +43,41 @@
 
 /** printf(3)-like logging macro for a TTY-only message. */
 #ifdef TSIG_DEBUG
-#define tsig_log_tty_with_status(n, ...)                           \
-  do {                                                             \
-    if (log->level >= LOG_INFO && log->console)                    \
-      tsig_log_msg_tty(log, (n), __FILE__, __LINE__, __VA_ARGS__); \
+#define tsig_log_tty(...)                                             \
+  do {                                                                \
+    if (log->level >= LOG_INFO && log->console && log->is_stdout_tty) \
+      tsig_log_msg_tty(log, __FILE__, __LINE__, __VA_ARGS__);         \
   } while (0)
 #else
-#define tsig_log_tty_with_status(n, ...)                \
-  do {                                                  \
-    if (log->level >= LOG_INFO && log->console)         \
-      tsig_log_msg_tty(log, (n), NULL, 0, __VA_ARGS__); \
+#define tsig_log_tty(...)                                             \
+  do {                                                                \
+    if (log->level >= LOG_INFO && log->console && log->is_stdout_tty) \
+      tsig_log_msg_tty(log, NULL, 0, __VA_ARGS__);                    \
   } while (0)
 #endif /* TSIG_DEBUG */
 
-#define tsig_log_tty(...) tsig_log_tty_with_status(0, __VA_ARGS__)
-
-/** printf(3)-like logging macro for a TTY-only status line. */
+/** printf(3)-like macro for defining a TTY-only status area. */
+#ifdef TSIG_DEBUG
+#define tsig_log_status(n, ...)                                        \
+  do {                                                                 \
+    if (log->level >= LOG_INFO && log->console && log->have_status &&  \
+        (1 <= (n) && (n) <= TSIG_LOG_STATUS_LINES))                    \
+      tsig_log_status_impl(log, (n), __FILE__, __LINE__, __VA_ARGS__); \
+  } while (0)
+#else
 #define tsig_log_status(n, ...)                                       \
   do {                                                                \
-    if (log->have_status && 1 <= (n) && (n) <= TSIG_LOG_STATUS_LINES) \
-      tsig_log_tty_with_status((n), __VA_ARGS__);                     \
+    if (log->level >= LOG_INFO && log->console && log->have_status && \
+        (1 <= (n) && (n) <= TSIG_LOG_STATUS_LINES))                   \
+      tsig_log_status_impl(log, (n), NULL, 0, __VA_ARGS__);           \
+  } while (0)
+#endif /* TSIG_DEBUG */
+
+/** Macro for printing a TTY-only status area. */
+#define tsig_log_status_print()                     \
+  do {                                              \
+    if (log->level >= LOG_INFO && log->have_status) \
+      tsig_log_status_print_impl(log);              \
   } while (0)
 
 /** Logging context. */
@@ -75,8 +90,9 @@ typedef struct tsig_log {
   FILE *log_file;     /** Log file. Will emit logs to it if not NULL. */
   bool syslog;        /** Whether to emit logs to syslog. */
 
-  bool have_status;                       /** Whether status area is enabled. */
-  int status_lines;                       /** Status area line count. */
+  bool have_status;      /** Whether status area is enabled. */
+  int status_lines;      /** Status area line count. */
+  int status_lines_disp; /** Status area displayed line count. */
   char status_line[TSIG_LOG_STATUS_LINES] /** Status lines.  */
                   [TSIG_LOG_STATUS_LINE_SIZE];
 } tsig_log_t;
@@ -86,8 +102,12 @@ void tsig_log_finish_init(tsig_log_t *log, char log_file[], bool syslog,
                           bool verbose, bool quiet);
 void tsig_log_msg(tsig_log_t *log, int level, const char *src_file,
                   int src_line, const char *fmt, ...);
-void tsig_log_msg_tty(tsig_log_t *log, int status_line, const char *src_file,
-                      int src_line, const char *fmt, ...);
+void tsig_log_msg_tty(tsig_log_t *log, const char *src_file, int src_line,
+                      const char *fmt, ...);
+void tsig_log_status_impl(tsig_log_t *log, int status_line,
+                          const char *src_file, int src_line, const char *fmt,
+                          ...);
+void tsig_log_status_print_impl(tsig_log_t *log);
 void tsig_log_deinit(tsig_log_t *log);
 void tsig_log_tty_enable_echo(void);
 void tsig_log_tty_disable_echo(void);
