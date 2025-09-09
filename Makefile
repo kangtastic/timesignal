@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Makefile: Makefile for use with GNU make.
+# Makefile: Top-level Makefile for use with GNU make.
 #
 # This file is part of timesignal.
 #
@@ -104,8 +104,15 @@ $(BUILDDIR):
 strip:            $(TARGET)
 	$(STRIP) --strip-unneeded $(TARGET)
 
+tests:
+	$(MAKE) -C tests
+
 clean:
 	rm -rf $(BUILDDIR) $(TARGET)
+	$(MAKE) -C tests clean
+
+distclean: clean
+	$(MAKE) -C tests distclean
 
 install:          $(TARGET)
 	install -d $(DESTDIR)$(SBIN)
@@ -114,4 +121,4 @@ install:          $(TARGET)
 uninstall:
 	rm -f $(DESTDIR)$(SBIN)/$(TARGET)
 
-.PHONY:           all debug strip clean install uninstall
+.PHONY:           all debug strip tests clean distclean install uninstall
