@@ -10,8 +10,8 @@
 #pragma once
 
 #define TSIG_DEFAULTS_NAME    "timesignal"
-#define TSIG_DEFAULTS_VERSION "0.0.1"
+#define TSIG_DEFAULTS_VERSION "0.1.0"
 #define TSIG_DEFAULTS_DESCRIPTION \
-  "Synchronize most radio-controlled (\"atomic\") clocks and watches."
+  "Synchronize most radio-controlled (\"atomic\") clocks using your speakers."
 #define TSIG_DEFAULTS_URL      "https://github.com/kangtastic/timesignal"
 #define TSIG_DEFAULTS_CFG_FILE "/etc/" TSIG_DEFAULTS_NAME ".conf"
