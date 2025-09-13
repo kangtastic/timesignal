@@ -640,6 +640,9 @@ static void station_update_msf(tsig_station_t *station, int64_t utc_timestamp) {
   bits[50] = min & 2;
   bits[51] = min & 1;
 
+  for (uint32_t i = 17; i <= 51; i++)
+    bits[i] = !!bits[i] << 1;
+
   bits[53] = is_chg;
   bits[54] = station_odd_parity(bits, 17, 25);
   bits[55] = station_odd_parity(bits, 25, 36);
@@ -647,9 +650,16 @@ static void station_update_msf(tsig_station_t *station, int64_t utc_timestamp) {
   bits[57] = station_odd_parity(bits, 39, 52);
   bits[58] = is_xmit_bst;
 
+  for (uint32_t i = 53; i <= 58; i++)
+    bits[i] |= 0x2;
+
   char *template = info->xmit_template;
-  for (uint32_t i = 0; i < sizeof(bits); i++)
-    station->xmit[i] = template[i] == '0' && bits[i] ? '1' : template[i];
+  for (uint32_t i = 0; i < sizeof(bits); i++) {
+    char bit = 17 <= i && i <= 51   ? !!bits[i]
+               : 53 <= i && i <= 58 ? bits[i] & ~0x2
+                                    : bits[i];
+    station->xmit[i] = template[i] == '0' && bit ? '1' : template[i];
+  }
 
   const char *chg_tz = is_bst ? "GMT" : "BST";
   const char *tz = is_xmit_bst ? "BST" : "GMT";
@@ -666,17 +676,33 @@ static void station_update_msf(tsig_station_t *station, int64_t utc_timestamp) {
   /* clang-format on */
 
   /*
-   * Marker: Low for 500 ms, 00: 100 ms, 01: 200 ms, 11: 300 ms.
+   * Low for 100 ms, then b1 and b0 in 100-200 and 200-300 ms (active-low),
+   * or low for another 400 ms (500 ms total) if primary minute marker.
    * Note that 11 can only occur during the secondary minute marker.
    */
+  uint32_t dsec = 100 / TSIG_STATION_MSECS_TICK;
   for (uint32_t i = 0, j = 0; i < sizeof(bits); i++) {
-    uint32_t dsec_lo = bits[i] == station_sync_marker ? 5 : !!bits[i] + 1;
-    dsec_lo += 53 <= i && i <= 58; /* Secondary 01111110 minute marker. */
-    uint32_t lo = 100 * dsec_lo / TSIG_STATION_MSECS_TICK;
-    uint32_t hi = TSIG_STATION_TICKS_SEC - lo;
-    for (; lo; j++, lo--)
+    uint32_t ticks = TSIG_STATION_TICKS_SEC;
+    uint32_t pre = dsec;
+    uint32_t hi = 0;
+    uint32_t lo = 0;
+    if (bits[i] == station_sync_marker) {
+      lo = 4 * dsec;
+    } else if (bits[i] == 3) {
+      lo = 2 * dsec;
+    } else if (bits[i] == 2) {
+      lo = dsec;
+    } else if (bits[i] == 1) {
+      hi = dsec;
+      lo = dsec;
+    }
+    for (; pre; j++, pre--, ticks--)
       station->xmit_level[j / CHAR_BIT] &= ~((1 << (j % CHAR_BIT)));
-    for (; hi; j++, hi--)
+    for (; hi; j++, hi--, ticks--)
+      station->xmit_level[j / CHAR_BIT] |= 1 << (j % CHAR_BIT);
+    for (; lo; j++, lo--, ticks--)
+      station->xmit_level[j / CHAR_BIT] &= ~((1 << (j % CHAR_BIT)));
+    for (; ticks; j++, ticks--)
       station->xmit_level[j / CHAR_BIT] |= 1 << (j % CHAR_BIT);
   }
 }
