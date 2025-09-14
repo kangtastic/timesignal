@@ -111,6 +111,9 @@ typedef struct station_status_info {
   char *template;                /** Template for bit readout string. */
   char *sections;                /** Bit readout sections after expansion. */
   uint8_t bounds[8];             /** Bit readout section bounds. */
+  char *template_morse;          /** `template` during JJY announcement. */
+  char *sections_morse;          /** `sections` during JJY announcement. */
+  uint8_t bounds_morse[8];       /** `bounds` during JJY announcement. */
 } station_status_info_t;
 
 static station_info_t station_info[] = {
@@ -186,15 +189,21 @@ static station_status_info_t station_status_info[] = {
         {
             .status_cb = station_status_jjy,
             .template = "M000X0000MXX00X0000MXX00X0000M0000XX00XMX00000000M00000XXXXM",
-            .sections = "minute    hour       day of year     parity  year     dow  leapsec",
-            .bounds = {9, 19, 34, 41, 49, 53},
+            .sections = "minute    hour       day of year     parity year      dow  leapsec",
+            .bounds = {9, 19, 34, 40, 49, 53},
+            .template_morse = "M000X0000MXX00X0000MXX00X0000M0000XX00XM-JJY-JJY-M000000XXXM",
+            .sections_morse = "minute    hour       day of year     parity morsecode status",
+            .bounds_morse = {9, 19, 34, 40, 49},
         },
     [TSIG_STATION_ID_JJY60] =
         {
             .status_cb = station_status_jjy,
             .template = "M000X0000MXX00X0000MXX00X0000M0000XX00XMX00000000M00000XXXXM",
-            .sections = "minute    hour       day of year     parity  year     dow  leapsec",
-            .bounds = {9, 19, 34, 41, 49, 53},
+            .sections = "minute    hour       day of year     parity year      dow  leapsec",
+            .bounds = {9, 19, 34, 40, 49, 53},
+            .template_morse = "M000X0000MXX00X0000MXX00X0000M0000XX00XM-JJY-JJY-M000000XXXM",
+            .sections_morse = "minute    hour       day of year     parity morsecode status",
+            .bounds_morse = {9, 19, 34, 40, 49},
         },
     [TSIG_STATION_ID_MSF] =
         {
@@ -523,43 +532,50 @@ static void station_update_jjy(tsig_station_t *station, int64_t utc_timestamp) {
   bits[36] = station_even_parity(bits, 12, 19);
   bits[37] = station_even_parity(bits, 1, 9);
 
-  uint8_t year_10 = (datetime.year % 100) / 10;
-  bits[41] = year_10 & 8;
-  bits[42] = year_10 & 4;
-  bits[43] = year_10 & 2;
-  bits[44] = year_10 & 1;
-
-  uint8_t year = datetime.year % 10;
-  bits[45] = year & 8;
-  bits[46] = year & 4;
-  bits[47] = year & 2;
-  bits[48] = year & 1;
-
-  uint8_t dow = datetime.dow;
-  bits[50] = dow & 4;
-  bits[51] = dow & 2;
-  bits[52] = dow & 1;
-
-  char *template = station_status_info[TSIG_STATION_ID_JJY].template;
-  for (uint32_t i = 0; i < sizeof(bits); i++)
-    station->xmit[i] = template[i] == '0' && bits[i] ? '1' : template[i];
-
-  /* clang-format off */
-  sprintf(station->meaning,
-          /* "%02hhu:%02hhu, day %hu of year %hu, weekday %hhu, leapsec end mon +0" */
-          /* e.g. "12:34, day 365 of year 99, weekday 4, leapsec end mon +0" */
-          "%02" PRIu8 ":%02" PRIu8 ", day %" PRIu16 " of year %" PRIu16
-          ", weekday %" PRIu8 ", leapsec end mon +0",
-          datetime.hour, datetime.min, datetime.doy, datetime.year % 100, dow);
-  /* clang-format on */
-
   bool is_announce = datetime.min == station_jjy_morse_min ||
                      datetime.min == station_jjy_morse_min2;
   if (is_announce) {
-    bits[50] = 0;
-    bits[51] = 0;
-    bits[52] = 0;
+    /* clang-format off */
+    sprintf(station->meaning,
+            /* "%02hhu:%02hhu, day %hu of year, callsign JJY, no service interruptions planned" */
+            /* e.g. "12:34, day 365 of year, callsign JJY, no service interruptions planned" */
+            "%02" PRIu8 ":%02" PRIu8 ", day %" PRIu16 " of year,"
+            " callsign JJY, no service interruptions planned",
+            datetime.hour, datetime.min, datetime.doy);
+    /* clang-format on */
+  } else {
+    uint8_t year_10 = (datetime.year % 100) / 10;
+    bits[41] = year_10 & 8;
+    bits[42] = year_10 & 4;
+    bits[43] = year_10 & 2;
+    bits[44] = year_10 & 1;
+
+    uint8_t year = datetime.year % 10;
+    bits[45] = year & 8;
+    bits[46] = year & 4;
+    bits[47] = year & 2;
+    bits[48] = year & 1;
+
+    uint8_t dow = datetime.dow;
+    bits[50] = dow & 4;
+    bits[51] = dow & 2;
+    bits[52] = dow & 1;
+
+    /* clang-format off */
+    sprintf(station->meaning,
+            /* "%02hhu:%02hhu, day %hu of year %hu, weekday %hhu, leapsec end mon +0" */
+            /* e.g. "12:34, day 365 of year 99, weekday 4, leapsec end mon +0" */
+            "%02" PRIu8 ":%02" PRIu8 ", day %" PRIu16 " of year %" PRIu16
+            ", weekday %" PRIu8 ", leapsec end mon +0",
+            datetime.hour, datetime.min, datetime.doy, datetime.year % 100, dow);
+    /* clang-format on */
   }
+
+  char *template = is_announce
+                       ? station_status_info[TSIG_STATION_ID_JJY].template_morse
+                       : station_status_info[TSIG_STATION_ID_JJY].template;
+  for (uint32_t i = 0; i < sizeof(bits); i++)
+    station->xmit[i] = template[i] == '0' && bits[i] ? '1' : template[i];
 
   /* Marker: High for 200 ms, 0: 800 ms, 1: 500 ms. */
   for (uint32_t i = 0, j = 0; i < sizeof(bits); i++) {
@@ -1026,6 +1042,11 @@ static void station_status_jjy(tsig_station_t *station, int64_t utc_timestamp) {
   datetime = tsig_datetime_parse_timestamp(utc_timestamp + info->utc_offset);
   sec = datetime.sec;
 
+  bool is_announce = datetime.min == station_jjy_morse_min ||
+                     datetime.min == station_jjy_morse_min2;
+  bool is_morse = is_announce && (station_jjy_morse_sec <= sec &&
+                                  sec < station_jjy_morse_end_sec);
+
   /* clang-format off */
   sprintf(buf,
           /* "%04hu-%02hhu-%02hhu %02hhu:%02hhu:%02hhu JST" */
@@ -1037,11 +1058,14 @@ static void station_status_jjy(tsig_station_t *station, int64_t utc_timestamp) {
   /* clang-format on */
 
   /* e.g. "JJY60   2099-12-31 12:34:56 JST, transmitting marker" */
+  /* e.g. "JJY60   2112-12-31 01:45:41 JST, transmitting JJY in Morse code" */
   const char *inverse = station->verbose ? station_tty_inverse : "";
   const char *reset = station->verbose ? station_tty_reset : "";
   bool is_jjy60 = station->station == TSIG_STATION_ID_JJY60;
   const char *callsign = is_jjy60 ? "JJY60" : "JJY";
-  if (xmit[sec] == 'M')
+  if (is_morse)
+    sprintf(cur, "JJY in Morse code");
+  else if (xmit[sec] == 'M')
     sprintf(cur, "marker");
   else if (xmit[sec] == 'X')
     sprintf(cur, "0");
@@ -1055,14 +1079,21 @@ static void station_status_jjy(tsig_station_t *station, int64_t utc_timestamp) {
   }
 
   /* e.g. "meaning 12:34, day 365 of year 99, weekday 4, leapsec end mon +0" */
+  /* e.g. "meaning 01:45, day 366 of year, callsign JJY, no service interruptions planned " */
   tsig_log_status(2, "meaning %s", station->meaning);
 
-  /* e.g. "   bits M000X0000 MXX00X0000 MXX00X0000M0000 XX00XMX 00000000 M000 00XXXXM" */
-  station_status_write_xmit_readout(buf, sec, xmit, status_info->bounds);
+  /* e.g. "   bits M000X0000 MXX00X0000 MXX00X0000M0000 XX00XM X00000000 M000 00XXXXM" */
+  /* e.g. "   bits M000X0000 MXX00X0000 MXX00X0000M0000 XX00XM -JJY-JJY- M000000XXXM" */
+  uint8_t *bounds =
+      is_announce ? status_info->bounds_morse : status_info->bounds;
+  station_status_write_xmit_readout(buf, sec, xmit, bounds);
   tsig_log_status(3, "   bits %s", buf);
 
-  /* e.g. "        minute    hour       day of year     parity  year     dow  leapsec" */
-  tsig_log_status(4, "        %s", status_info->sections);
+  /* e.g. "        minute    hour       day of year     parity year      dow  leapsec" */
+  /* e.g. "        minute    hour       day of year     parity morsecode status" */
+  char *sections =
+      is_announce ? status_info->sections_morse : status_info->sections;
+  tsig_log_status(4, "        %s", sections);
 
   tsig_log_status_print();
 }
