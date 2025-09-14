@@ -1,0 +1,376 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+/**
+ * test_station.c: Test time station waveform generator.
+ *
+ * This file is part of timesignal.
+ *
+ * Copyright © 2025 James Seo <james@equiv.tech>
+ */
+
+#include "station.c"
+
+#include "mock_log.c"
+
+#include "datetime.c"
+#include "iir.c"
+#include "mapping.c"
+#include "util.c"
+
+#include <setjmp.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#include <cmocka.h>
+
+static void test_station_lerp(void **state) {
+  (void)state; /* Suppress unused parameter warning. */
+
+  double epsilon = 0.000001;
+
+  assert_double_equal(station_lerp(1.0, 0.0), 0.015, epsilon);
+  assert_double_equal(station_lerp(1.0, 0.996), 1.0, epsilon);
+  assert_double_equal(station_lerp(1.0, 1.0), 1.0, epsilon);
+}
+
+static void test_station_even_parity(void **state) {
+  (void)state; /* Suppress unused parameter warning. */
+
+  uint8_t data[] = {1, 3, 0};
+
+  assert_int_equal(station_even_parity(data, 0, 3), 1);
+  assert_int_equal(station_even_parity(data, 1, 3), 0);
+  assert_int_equal(station_even_parity(data, 2, 3), 0);
+}
+
+static void test_station_odd_parity(void **state) {
+  (void)state; /* Suppress unused parameter warning. */
+
+  uint8_t data[] = {1, 3, 0};
+
+  assert_int_equal(station_odd_parity(data, 0, 3), 0);
+  assert_int_equal(station_odd_parity(data, 1, 3), 1);
+  assert_int_equal(station_odd_parity(data, 2, 3), 1);
+}
+
+static void test_station_update_bpc(void **state) {
+  (void)state; /* Suppress unused parameter warning. */
+
+  tsig_station_t bpc = {.station = TSIG_STATION_ID_BPC};
+  int64_t utc_timestamp = 981147360000; /* 2001-02-03 04:56:00 CST */
+  uint8_t xmit_level[] = {
+      /* clang-format off */
+      0xff, 0xff, 0xcf, 0xff, 0xff, 0xfc, 0xff, 0x0f, 0xff, 0xff,
+      0xfc, 0xff, 0x0f, 0xf0, 0xff, 0xc0, 0xff, 0xcf, 0xff, 0xff,
+      0xf0, 0xff, 0x0f, 0xfc, 0xff, 0xfc, 0xff, 0xcf, 0xff, 0xff,
+      0xfc, 0xff, 0x0f, 0xf0, 0xff, 0xfc, 0xff, 0x0f, 0xfc, 0xff,
+      0xfc, 0xff, 0xcf, 0xff, 0xff, 0xf0, 0xff, 0xcf, 0xff, 0xff,
+      0xff, 0xff, 0x0f, 0xfc, 0xff, 0xfc, 0xff, 0x0f, 0xff, 0xff,
+      0xfc, 0xff, 0x0f, 0xf0, 0xff, 0xc0, 0xff, 0xcf, 0xff, 0xff,
+      0xf0, 0xff, 0x0f, 0xfc, 0xff, 0xf0, 0xff, 0xcf, 0xff, 0xff,
+      0xfc, 0xff, 0x0f, 0xf0, 0xff, 0xfc, 0xff, 0x0f, 0xfc, 0xff,
+      0xfc, 0xff, 0xcf, 0xff, 0xff, 0xf0, 0xff, 0xcf, 0xff, 0xff,
+      0xff, 0xff, 0x0f, 0xc0, 0xff, 0xfc, 0xff, 0x0f, 0xff, 0xff,
+      0xfc, 0xff, 0x0f, 0xf0, 0xff, 0xc0, 0xff, 0xcf, 0xff, 0xff,
+      0xf0, 0xff, 0x0f, 0xfc, 0xff, 0xf0, 0xff, 0xcf, 0xff, 0xff,
+      0xfc, 0xff, 0x0f, 0xf0, 0xff, 0xfc, 0xff, 0x0f, 0xfc, 0xff,
+      0xfc, 0xff, 0xcf, 0xff, 0xff, 0xf0, 0xff, 0xcf, 0xff, 0xff,
+      /* clang-format on */
+  };
+  const char *xmit = "MM00XX0100111000X11000X00011001000000100";
+  const char *meaning = "04:56:00 AM, weekday 6, day 3 of month 2 of year 1";
+
+  station_update_bpc(&bpc, utc_timestamp);
+  assert_memory_equal(bpc.xmit_level, xmit_level, sizeof(xmit_level));
+  assert_string_equal(bpc.xmit, xmit);
+  assert_string_equal(bpc.meaning, meaning);
+}
+
+static void test_station_update_dcf77(void **state) {
+  (void)state; /* Suppress unused parameter warning. */
+
+  tsig_station_t dcf77 = {.station = TSIG_STATION_ID_DCF77};
+  int64_t utc_timestamp = 4078429140000; /* 2099-03-29 01:59:00 CET */
+  uint8_t xmit_level[] = {
+      /* clang-format off */
+      0xfc, 0xff, 0xcf, 0xff, 0xff, 0xfc, 0xff, 0xcf, 0xff, 0xff,
+      0xfc, 0xff, 0xcf, 0xff, 0xff, 0xfc, 0xff, 0xcf, 0xff, 0xff,
+      0xfc, 0xff, 0xcf, 0xff, 0xff, 0xfc, 0xff, 0xcf, 0xff, 0xff,
+      0xfc, 0xff, 0xcf, 0xff, 0xff, 0xfc, 0xff, 0xcf, 0xff, 0xff,
+      0xf0, 0xff, 0x0f, 0xff, 0xff, 0xfc, 0xff, 0xcf, 0xff, 0xff,
+      0xf0, 0xff, 0xcf, 0xff, 0xff, 0xfc, 0xff, 0xcf, 0xff, 0xff,
+      0xfc, 0xff, 0xcf, 0xff, 0xff, 0xfc, 0xff, 0xcf, 0xff, 0xff,
+      0xfc, 0xff, 0x0f, 0xff, 0xff, 0xf0, 0xff, 0xcf, 0xff, 0xff,
+      0xfc, 0xff, 0xcf, 0xff, 0xff, 0xfc, 0xff, 0xcf, 0xff, 0xff,
+      0xf0, 0xff, 0xcf, 0xff, 0xff, 0xfc, 0xff, 0x0f, 0xff, 0xff,
+      0xfc, 0xff, 0x0f, 0xff, 0xff, 0xf0, 0xff, 0x0f, 0xff, 0xff,
+      0xf0, 0xff, 0x0f, 0xff, 0xff, 0xf0, 0xff, 0xcf, 0xff, 0xff,
+      0xfc, 0xff, 0xcf, 0xff, 0xff, 0xf0, 0xff, 0xcf, 0xff, 0xff,
+      0xfc, 0xff, 0x0f, 0xff, 0xff, 0xf0, 0xff, 0xcf, 0xff, 0xff,
+      0xfc, 0xff, 0x0f, 0xff, 0xff, 0xfc, 0xff, 0xff, 0xff, 0xff,
+      /* clang-format on */
+  };
+  const char *xmit =
+      "XXXXXXXXXXXXXXX01100X00000000110000010010111111000100110010M";
+  const char *meaning =
+      "03:00 CEST, CEST next min yes, weekday 7, day 29 of month 3 of year 99";
+
+  station_update_dcf77(&dcf77, utc_timestamp);
+  assert_memory_equal(dcf77.xmit_level, xmit_level, sizeof(xmit_level));
+  assert_string_equal(dcf77.xmit, xmit);
+  assert_string_equal(dcf77.meaning, meaning);
+}
+
+static void test_station_update_jjy(void **state) {
+  (void)state; /* Suppress unused parameter warning. */
+
+  tsig_station_t jjy = {.station = TSIG_STATION_ID_JJY60};
+  int64_t utc_timestamp = 4512558180000; /* 2112-12-31 01:23:00 JST */
+  uint8_t xmit_level[] = {
+      /* clang-format off */
+      0x0f, 0x00, 0xf0, 0xff, 0x0f, 0xff, 0x03, 0xf0, 0xff, 0x0f,
+      0xff, 0xff, 0xf0, 0xff, 0x0f, 0xff, 0xff, 0xf0, 0x3f, 0x00,
+      0xff, 0x03, 0xf0, 0x00, 0x00, 0xff, 0xff, 0xf0, 0xff, 0x0f,
+      0xff, 0xff, 0xf0, 0xff, 0x0f, 0xff, 0xff, 0xf0, 0xff, 0x0f,
+      0xff, 0xff, 0xf0, 0xff, 0x0f, 0xff, 0x03, 0xf0, 0x00, 0x00,
+      0xff, 0xff, 0xf0, 0xff, 0x0f, 0xff, 0x03, 0xf0, 0x3f, 0x00,
+      0xff, 0xff, 0xf0, 0xff, 0x0f, 0xff, 0x03, 0xf0, 0x3f, 0x00,
+      0xff, 0xff, 0xf0, 0x00, 0x00, 0xff, 0xff, 0xf0, 0x3f, 0x00,
+      0xff, 0x03, 0xf0, 0xff, 0x0f, 0xff, 0xff, 0xf0, 0xff, 0x0f,
+      0xff, 0x03, 0xf0, 0x3f, 0x00, 0xff, 0xff, 0xf0, 0x00, 0x00,
+      0xff, 0xff, 0xf0, 0xff, 0x0f, 0xff, 0xff, 0xf0, 0xff, 0x0f,
+      0xff, 0x03, 0xf0, 0xff, 0x0f, 0xff, 0xff, 0xf0, 0x3f, 0x00,
+      0xff, 0xff, 0xf0, 0x00, 0x00, 0xff, 0x03, 0xf0, 0x3f, 0x00,
+      0xff, 0xff, 0xf0, 0xff, 0x0f, 0xff, 0xff, 0xf0, 0xff, 0x0f,
+      0xff, 0xff, 0xf0, 0xff, 0x0f, 0xff, 0xff, 0xf0, 0x00, 0x00,
+      /* clang-format on */
+  };
+  const char *xmit =
+      "M010X0011MXX00X0001MXX11X0110M0110XX11XMX00010010M11000XXXXM";
+  const char *meaning =
+      "01:23, day 366 of year 12, weekday 6, leapsec end mon +0";
+
+  station_update_jjy(&jjy, utc_timestamp);
+  assert_memory_equal(jjy.xmit_level, xmit_level, sizeof(xmit_level));
+  assert_string_equal(jjy.xmit, xmit);
+  assert_string_equal(jjy.meaning, meaning);
+}
+
+static void test_station_update_msf(void **state) {
+  (void)state; /* Suppress unused parameter warning. */
+
+  tsig_station_t msf = {.station = TSIG_STATION_ID_MSF, .dut1 = -654};
+  int64_t utc_timestamp = 4078429140000; /* 2099-03-29 00:59:00 GMT */
+  uint8_t xmit_level[] = {
+      /* clang-format off */
+      0x00, 0xfc, 0xcf, 0xff, 0xff, 0xfc, 0xff, 0xcf, 0xff, 0xff,
+      0xfc, 0xff, 0xcf, 0xff, 0xff, 0xfc, 0xff, 0xcf, 0xff, 0xff,
+      0xfc, 0xff, 0xcf, 0xfc, 0xff, 0xcc, 0xff, 0xcf, 0xfc, 0xff,
+      0xcc, 0xff, 0xcf, 0xfc, 0xff, 0xcc, 0xff, 0xcf, 0xff, 0xff,
+      0xfc, 0xff, 0x0f, 0xff, 0xff, 0xfc, 0xff, 0xcf, 0xff, 0xff,
+      0xf0, 0xff, 0x0f, 0xff, 0xff, 0xfc, 0xff, 0xcf, 0xff, 0xff,
+      0xf0, 0xff, 0xcf, 0xff, 0xff, 0xfc, 0xff, 0xcf, 0xff, 0xff,
+      0xf0, 0xff, 0x0f, 0xff, 0xff, 0xf0, 0xff, 0xcf, 0xff, 0xff,
+      0xf0, 0xff, 0xcf, 0xff, 0xff, 0xfc, 0xff, 0x0f, 0xff, 0xff,
+      0xfc, 0xff, 0xcf, 0xff, 0xff, 0xfc, 0xff, 0xcf, 0xff, 0xff,
+      0xfc, 0xff, 0xcf, 0xff, 0xff, 0xfc, 0xff, 0x0f, 0xff, 0xff,
+      0xfc, 0xff, 0xcf, 0xff, 0xff, 0xfc, 0xff, 0xcf, 0xff, 0xff,
+      0xfc, 0xff, 0xcf, 0xff, 0xff, 0xfc, 0xff, 0xcf, 0xff, 0xff,
+      0xfc, 0xff, 0x0f, 0xfc, 0xff, 0xc0, 0xff, 0x0f, 0xff, 0xff,
+      0xc0, 0xff, 0x0f, 0xff, 0xff, 0xc0, 0xff, 0xcf, 0xff, 0xff,
+      /* clang-format on */
+  };
+  const char *xmit =
+      "M000000001111110010011001000111010010000000100000000X110101X";
+  const char *meaning =
+      "DUT1 -0.6, d29 of m3 of y99, weekday 0, 02:00 BST, BST next hour yes";
+
+  station_update_msf(&msf, utc_timestamp);
+  assert_memory_equal(msf.xmit_level, xmit_level, sizeof(xmit_level));
+  assert_string_equal(msf.xmit, xmit);
+  assert_string_equal(msf.meaning, meaning);
+}
+
+static void test_station_update_wwvb(void **state) {
+  (void)state; /* Suppress unused parameter warning. */
+
+  tsig_station_t wwvb = {.station = TSIG_STATION_ID_WWVB, .dut1 = 432};
+  int64_t utc_timestamp = 4507838580000; /* 2112-11-05 21:23:00 EDT */
+  uint8_t xmit_level[] = {
+      /* clang-format off */
+      0x00, 0x00, 0x0f, 0xff, 0xff, 0x00, 0xfc, 0x0f, 0xff, 0xff,
+      0xf0, 0xff, 0x0f, 0xff, 0xff, 0xf0, 0xff, 0x0f, 0xc0, 0xff,
+      0x00, 0xfc, 0x0f, 0x00, 0xf0, 0xf0, 0xff, 0x0f, 0xff, 0xff,
+      0xf0, 0xff, 0x0f, 0xff, 0xff, 0xf0, 0xff, 0x0f, 0xff, 0xff,
+      0xf0, 0xff, 0x0f, 0xff, 0xff, 0x00, 0xfc, 0x0f, 0x00, 0xf0,
+      0xf0, 0xff, 0x0f, 0xff, 0xff, 0x00, 0xfc, 0x0f, 0xc0, 0xff,
+      0xf0, 0xff, 0x0f, 0xff, 0xff, 0xf0, 0xff, 0x0f, 0xff, 0xff,
+      0x00, 0xfc, 0x0f, 0x00, 0xf0, 0xf0, 0xff, 0x0f, 0xff, 0xff,
+      0xf0, 0xff, 0x0f, 0xc0, 0xff, 0xf0, 0xff, 0x0f, 0xff, 0xff,
+      0x00, 0xfc, 0x0f, 0xff, 0xff, 0x00, 0xfc, 0x0f, 0x00, 0xf0,
+      0xf0, 0xff, 0x0f, 0xc0, 0xff, 0xf0, 0xff, 0x0f, 0xff, 0xff,
+      0xf0, 0xff, 0x0f, 0xff, 0xff, 0xf0, 0xff, 0x0f, 0xff, 0xff,
+      0x00, 0xfc, 0x0f, 0x00, 0xf0, 0xf0, 0xff, 0x0f, 0xff, 0xff,
+      0x00, 0xfc, 0x0f, 0xff, 0xff, 0xf0, 0xff, 0x0f, 0xc0, 0xff,
+      0xf0, 0xff, 0x0f, 0xff, 0xff, 0x00, 0xfc, 0x0f, 0x00, 0xf0,
+      /* clang-format on */
+  };
+  const char *xmit =
+      "M010X0011MXX00X0001MXX11X0001M0001XX101M0100X0001M0010X1001M";
+  const char *meaning =
+      "01:23, day 311 of year 12, DUT1 +0.4, leap year yes, DST ends today";
+
+  station_update_wwvb(&wwvb, utc_timestamp);
+  assert_memory_equal(wwvb.xmit_level, xmit_level, sizeof(xmit_level));
+  assert_string_equal(wwvb.xmit, xmit);
+  assert_string_equal(wwvb.meaning, meaning);
+}
+
+static void test_station_status_write_xmit_readout(void **state) {
+  (void)state; /* Suppress unused parameter warning. */
+
+  char *xmit = "AnyStringWithLengthSixtyCharactersWorksAsTheModelForThisTest";
+  uint8_t xmit_bounds[8] = {3, 9, 52, 56};
+  char buf[128];
+
+  station_status_write_xmit_readout(buf, 9, xmit, xmit_bounds);
+  assert_string_equal(
+      "Any String \x1b[7mW\x1b[0mithLengthSixtyCharacters"
+      "WorksAsTheModelFor This Test",
+      buf);
+}
+
+static void test_tsig_station_cb(void **state) {
+  (void)state; /* Suppress unused parameter warning. */
+
+  tsig_station_t station;
+  tsig_cfg_t cfg = {
+      .station = TSIG_STATION_ID_JJY60,
+      .base = 0,
+      .rate = TSIG_AUDIO_RATE_48000,
+  };
+  tsig_log_t log;
+  double ref[8] = {
+      0.00000000000000000000e+00,
+      4.99999999999999833467e-01,
+      -8.66025403784438374544e-01,
+      9.99999999999999777955e-01,
+  };
+  double cb_buf[8] = {0.0};
+
+  tsig_station_init(&station, &cfg, &log);
+  tsig_station_cb((void *)&station, cb_buf, 4);
+  assert_memory_equal(cb_buf, ref, sizeof(cb_buf));
+}
+
+static void test_tsig_station_init(void **state) {
+  (void)state; /* Suppress unused parameter warning. */
+
+  uint8_t zeros[4096] = {0};
+  tsig_station_t station;
+  tsig_cfg_t cfg;
+  tsig_log_t log;
+
+  cfg = (tsig_cfg_t){
+      .station = TSIG_STATION_ID_WWVB,
+      .base = 4102444799999,
+      .offset = 1,
+      .dut1 = 0,
+      .timeout = 1234,
+      .backend = TSIG_BACKEND_PIPEWIRE,
+      .device = {"default"},
+      .format = TSIG_AUDIO_FORMAT_S16,
+      .rate = TSIG_AUDIO_RATE_48000,
+      .channels = 1,
+      .smooth = true,
+      .ultrasound = false,
+      .audible = false,
+      .log_file = {""},
+      .syslog = false,
+      .verbose = false,
+      .quiet = false,
+  };
+
+  tsig_station_init(&station, &cfg, &log);
+
+  assert_int_equal(station.station, TSIG_STATION_ID_WWVB);
+  assert_int_equal(station.base, 4102444799999);
+  assert_int_equal(station.offset, 1);
+  assert_int_equal(station.dut1, 0);
+  assert_true(station.smooth);
+  assert_false(station.audible);
+  assert_int_equal(station.rate, TSIG_AUDIO_RATE_48000);
+  assert_memory_equal(station.xmit_level, zeros, sizeof(station.xmit_level));
+  assert_memory_equal(station.xmit, zeros, sizeof(station.xmit));
+  assert_memory_equal(station.meaning, zeros, sizeof(station.meaning));
+  assert_int_equal(station.next_timestamp, station_first_run);
+  assert_int_equal(station.samples_tick,
+                   TSIG_AUDIO_RATE_48000 * TSIG_STATION_MSECS_TICK / 1000);
+  assert_int_equal(station.freq, 20000);
+  assert_false(station.verbose);
+}
+
+static void test_tsig_station_set_rate(void **state) {
+  (void)state; /* Suppress unused parameter warning. */
+
+  tsig_station_t station;
+
+  tsig_station_set_rate(&station, 123000);
+  assert_int_equal(station.rate, 123000);
+  assert_int_equal(station.samples_tick,
+                   123000 * TSIG_STATION_MSECS_TICK / 1000);
+  assert_int_equal(station.next_timestamp, 0);
+}
+
+static void test_tsig_station_id(void **state) {
+  (void)state; /* Suppress unused parameter warning. */
+
+  assert_int_equal(tsig_station_id("BPC"), TSIG_STATION_ID_BPC);
+  assert_int_equal(tsig_station_id("BpC"), TSIG_STATION_ID_BPC);
+  assert_int_equal(tsig_station_id("DCF77"), TSIG_STATION_ID_DCF77);
+  assert_int_equal(tsig_station_id("DcF77"), TSIG_STATION_ID_DCF77);
+  assert_int_equal(tsig_station_id("JJY"), TSIG_STATION_ID_JJY);
+  assert_int_equal(tsig_station_id("JjY"), TSIG_STATION_ID_JJY);
+  assert_int_equal(tsig_station_id("JJY40"), TSIG_STATION_ID_JJY);
+  assert_int_equal(tsig_station_id("JjY40"), TSIG_STATION_ID_JJY);
+  assert_int_equal(tsig_station_id("JJY60"), TSIG_STATION_ID_JJY60);
+  assert_int_equal(tsig_station_id("JjY60"), TSIG_STATION_ID_JJY60);
+  assert_int_equal(tsig_station_id("MSF"), TSIG_STATION_ID_MSF);
+  assert_int_equal(tsig_station_id("MsF"), TSIG_STATION_ID_MSF);
+  assert_int_equal(tsig_station_id("WwVb"), TSIG_STATION_ID_WWVB);
+  assert_int_equal(tsig_station_id("WwVb"), TSIG_STATION_ID_WWVB);
+  assert_int_equal(tsig_station_id("invalid"), TSIG_STATION_ID_UNKNOWN);
+  assert_int_equal(tsig_station_id(""), TSIG_STATION_ID_UNKNOWN);
+}
+
+static void test_tsig_station_name(void **state) {
+  (void)state; /* Suppress unused parameter warning. */
+
+  assert_string_equal(tsig_station_name(TSIG_STATION_ID_BPC), "BPC");
+  assert_string_equal(tsig_station_name(TSIG_STATION_ID_DCF77), "DCF77");
+  assert_string_equal(tsig_station_name(TSIG_STATION_ID_JJY), "JJY");
+  assert_string_equal(tsig_station_name(TSIG_STATION_ID_JJY60), "JJY60");
+  assert_string_equal(tsig_station_name(TSIG_STATION_ID_MSF), "MSF");
+  assert_string_equal(tsig_station_name(TSIG_STATION_ID_WWVB), "WWVB");
+}
+
+int main(void) {
+  const struct CMUnitTest tests[] = {
+      cmocka_unit_test(test_station_lerp),
+      cmocka_unit_test(test_station_even_parity),
+      cmocka_unit_test(test_station_odd_parity),
+      cmocka_unit_test(test_station_update_bpc),
+      cmocka_unit_test(test_station_update_dcf77),
+      cmocka_unit_test(test_station_update_jjy),
+      cmocka_unit_test(test_station_update_msf),
+      cmocka_unit_test(test_station_update_wwvb),
+      cmocka_unit_test(test_station_status_write_xmit_readout),
+      cmocka_unit_test(test_tsig_station_cb),
+      cmocka_unit_test(test_tsig_station_init),
+      cmocka_unit_test(test_tsig_station_set_rate),
+      cmocka_unit_test(test_tsig_station_id),
+      cmocka_unit_test(test_tsig_station_name),
+  };
+
+  return cmocka_run_group_tests(tests, NULL, NULL);
+}
