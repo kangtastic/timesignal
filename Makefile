@@ -48,8 +48,10 @@ CROSS_COMPILE     ?=
 CC                := $(CROSS_COMPILE)$(CC)
 STRIP             := $(CROSS_COMPILE)$(STRIP)
 
-CFLAGS            ?= -O2 -fstack-protector-strong -Wall -Wextra -Wformat -Werror=format-security -fPIE -std=gnu11
+CFLAGS            ?= -O2 -Wall -Wextra -Wformat -Werror=format-security \
+                     -fstack-protector-strong -fPIE -std=gnu11
 CFLAGS            += -I$(INCDIR)
+CFLAGS_DEBUG      := -O0 -g -fno-omit-frame-pointer -DTSIG_DEBUG
 CFLAGS_EXTRA      :=
 
 LDFLAGS           ?= -pie -Wl,-z,relro -Wl,-z,now
@@ -88,9 +90,12 @@ endif
 
 all:              $(TARGET)
 
-debug:            CFLAGS := $(filter-out -O2,$(CFLAGS)) -fsanitize=address -fno-omit-frame-pointer -O0 -g -DTSIG_DEBUG
-debug:            LDFLAGS += -fsanitize=address
+debug:            CFLAGS := $(filter-out -O%,$(CFLAGS)) $(CFLAGS_DEBUG)
 debug:            clean $(TARGET)
+
+debug-asan:       CFLAGS := $(filter-out -O2,$(CFLAGS)) -fsanitize=address $(CFLAGS_DEBUG)
+debug-asan:       LIBS := -fsanitize=address $(LIBS)
+debug-asan:       clean $(TARGET)
 
 $(TARGET):        $(OBJ)
 	$(CC) $(OBJ) -o $@ $(LDFLAGS) $(LIBS)
@@ -107,6 +112,9 @@ strip:            $(TARGET)
 tests:
 	$(MAKE) -C tests
 
+run-tests:        tests
+	$(MAKE) -C tests run-tests
+
 clean:
 	rm -rf $(BUILDDIR) $(TARGET)
 	$(MAKE) -C tests clean
@@ -121,4 +129,4 @@ install:          $(TARGET)
 uninstall:
 	rm -f $(DESTDIR)$(SBIN)/$(TARGET)
 
-.PHONY:           all debug strip tests clean distclean install uninstall
+.PHONY:           all debug debug-asan strip tests run-tests clean distclean install uninstall

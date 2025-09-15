@@ -18,12 +18,12 @@ CC                ?= gcc
 
 CFLAGS            ?= -O0 -g -Wall -Wextra -Wformat -Werror=format-security \
                      -fno-omit-frame-pointer -fstack-protector-strong \
-                     -fsanitize=address -fPIE -std=gnu11
+                     -fPIE -std=gnu11
 CFLAGS            += -I$(SRCDIR) -I$(INCDIR) -I$(CMOCKADIR)/include
 
-LDFLAGS           ?= -pie -Wl,-z,relro -Wl,-z,now -fsanitize=address
+LDFLAGS           ?= -pie -Wl,-z,relro -Wl,-z,now
 LDFLAGS           += -L$(CMOCKABUILDDIR)/src -Wl,-rpath=$(CMOCKABUILDDIR)/src
-LDFLAGS           += -lcmocka
+LIBS              := -lcmocka
 
 _TESTS            := $(wildcard test_*.c)
 TESTS             := $(patsubst test_%.c,test_%,$(_TESTS))
@@ -66,12 +66,19 @@ clean:
 distclean:        clean
 	rm -rf $(CMOCKABUILDDIR)
 
-tests:            $(TESTS)
+tests:            clean $(TESTS)
+
+tests-asan:       CFLAGS += -fsanitize=address
+tests-asan:       LIBS := -fsanitize=address $(LIBS)
+tests-asan:       tests
 
 run-tests:        tests
 	for test_exe in $(TESTS); do \
-		./$$test_exe; \
+		./$$test_exe || exit $$?; \
 	done
+
+run-tests-asan:   tests-asan
+run-tests-asan:   run-tests
 
 $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
@@ -84,6 +91,6 @@ $(CMOCKABUILDDIR):
 	@(cd $(CMOCKABUILDDIR) && cmake ../ && make -s)
 
 test_%:           $(BUILDDIR)/test_%.o
-	$(CC) $< -o $@ $(call ldflags,$@)
+	$(CC) $< -o $@ $(call ldflags,$@) $(LIBS)
 
-.PHONY:           all clean distclean tests run-tests
+.PHONY:           all clean distclean tests tests-asan run-tests run-tests-asan
