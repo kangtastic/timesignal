@@ -106,10 +106,11 @@ static const char cfg_help_fmt[] = {
     TSIG_DEFAULTS_NAME " " TSIG_DEFAULTS_VERSION " <" TSIG_DEFAULTS_URL ">\n"
     TSIG_DEFAULTS_DESCRIPTION "\n"
     "\n"
-    "Usage: %s [OPTION]...\n"
+    "Usage: %s [OPTION]... [STATION]\n"
+    "\n"
+    "STATION may be BPC, DCF77, JJY, JJY60, MSF, or WWVB (default: WWVB).\n"
     "\n"
     "Time signal options:\n"
-    "  -s, --station=STATION    time station to emulate\n"
     "  -b, --base=BASE          time base in YYYY-MM-DD HH:mm:ss[(+-)hhmm] format\n"
     "  -o, --offset=OFFSET      user offset in [+-]HH:mm:ss[.SSS] format\n"
     "  -d, --dut1=DUT1          DUT1 value in ms (only for MSF and WWVB)\n"
@@ -154,7 +155,6 @@ static const char cfg_help_fmt[] = {
 static const char cfg_longhelp_fmt[] = {
     /* clang-format off */
     "Allowed option values (not all work on all systems):\n"
-    "  time station   BPC, DCF77, JJY, JJY60, MSF, WWVB\n"
     "  time base      1970-01-01 00:00:00+0000 to 9999-12-31 23:59:59+2359\n"
     "  user offset    -23:59:59.999 to 23:59:59.999\n"
     "  DUT1 value     -999 to 999\n"
@@ -186,7 +186,6 @@ static const char cfg_longhelp_fmt[] = {
     "  quiet          provide to turn on\n"
     "\n"
     "Default option values:\n"
-    "  time station   WWVB\n"
     "  time base      current system time\n"
     "  user offset    00:00:00.000\n"
     "  DUT1 value     0\n"
@@ -245,7 +244,6 @@ static tsig_cfg_t cfg_default = {
 
 /** Long options. */
 static struct option cfg_longopts[] = {
-    {"station", required_argument, NULL, 's'},
     {"base", required_argument, NULL, 'b'},
     {"offset", required_argument, NULL, 'o'},
     {"dut1", required_argument, NULL, 'd'},
@@ -277,7 +275,7 @@ static struct option cfg_longopts[] = {
 
 /** Short options. */
 static const char cfg_opts[] = {
-    "s:b:o:d:t:"
+    "b:o:d:t:"
 
 #ifdef TSIG_HAVE_BACKENDS
     "m:"
@@ -1079,10 +1077,6 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
 
     /* NOTE: Logging while parsing cmdline args is to console only. */
     switch (opt) {
-      case 's':
-        is_ok = cfg_set_station(cfg, log, optarg);
-        got_station = true;
-        break;
       case 'b':
         is_ok = cfg_set_base(cfg, log, optarg);
         got_base = true;
@@ -1168,6 +1162,12 @@ tsig_cfg_init_result_t tsig_cfg_init(tsig_cfg_t *cfg, tsig_log_t *log, int argc,
         is_ok = false;
         break;
     }
+  }
+
+  /* Parse one positional argument, which should be the station. */
+  if (is_ok && optind < argc) {
+    is_ok = cfg_set_station(cfg, log, argv[optind]);
+    got_station = true;
   }
 
   /* Parse config file. */
