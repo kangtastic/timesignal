@@ -1,0 +1,512 @@
+'\" t
+.\" SPDX-License-Identifier: GPL-3.0-or-later
+.\"
+.\" timesignal.1: Man page.
+.\"
+.\" This file is part of timesignal.
+.\"
+.\" Copyright © 2025 James Seo <james@equiv.tech>
+.
+.
+.TH TIMESIGNAL 1 "18 September 2025" "timesignal __VERSION__"
+.
+.
+.SH NAME
+.P
+timesignal \- synchronize radio\-controlled (\(lqatomic\(rq) clocks
+using speakers
+.
+.
+.SH SYNOPSIS
+.
+.SY timesignal
+.RI [ OPTION ].\|.\|.\&
+.RI [ STATION ]
+.YS
+.
+.SH DESCRIPTION
+.
+.P
+.B timesignal
+emulates radio time signal broadcasts from
+.BR BPC ,
+.BR DCF77 ,
+.BR JJY ,
+.BR MSF ,
+and
+.BR WWVB .
+.
+.P
+The vast majority of all radio\-controlled clocks and watches (often
+marketed as \(lqatomic clocks\(rq) rely a time signal broadcast from
+one of these five stations. However, these broadcasts are limited in
+geographic range and notoriously prone to interference in urban areas,
+so many such clocks end up never actually using their self\-setting
+functionality.
+.
+.P
+.B timesignal
+may allow setting such clocks when/where a suitable signal is not
+otherwise available by generating an audio waveform intentionally crafted
+to create, when played back through consumer\-grade audio hardware, the
+right kind of radio frequency (RF) noise to be mistaken for a time signal
+broadcast.
+.
+.
+.SH OPTIONS
+.P
+Option
+.B names
+are case\-sensitive, but option
+.I values
+are
+generally not; for example,
+.I WWVB
+and
+.I "\-m\~PipeWire"
+are equivalent to
+.I wwvb
+and
+.IR "\-m\~pipewire".
+.
+.P
+Not all option values work on all systems.
+.
+.SS Time station selection
+.
+.P
+The sole positional argument
+.I STATION
+is the name of the time station to emulate.
+.
+.P
+This may be
+.IR BPC ,
+.IR DCF77 ,
+.IR JJY ,
+.IR JJY60 ,
+.IR MSF ,
+or
+.IR WWVB ,
+corresponding to one of the supported time stations below:
+.
+.P
+.TS
+allbox tab(;);
+cb cb cb
+l l c
+l l c
+l l c
+l l c
+l l c
+l l c.
+Name;Location;Frequency
+BPC;Shangqiu, Henan, China;68.5 kHz
+DCF77;Mainhausen, Hesse, Germany;77.5 kHz
+JJY;Tamura, Fukushima, Japan;40 kHz
+JJY60;Saga, Saga, Japan;60 kHz
+MSF;Anthorn, Cumbria, United Kingdom;60 kHz
+WWVB;Fort Collins, Colorado, United States;60 kHz
+.TE
+.
+.P
+If not provided, the time station to emulate is
+.IR WWVB .
+.
+.SS Time signal options
+.
+.TP
+\fB\-b\fI BASE\fR, \fB\-\-base\fR=\fIBASE
+Time base in
+.IR "YYYY\-MM\-DD HH:mm:ss" [ (+\-)hhmm ]
+format, from
+.I "\(dq1970\-01\-01 00:00:00+0000\(dq"
+to
+.IR "\(dq9999\-12\-31 23:59:59+2359\(dq" .
+.br
+The emulated time signal starts from the date and time specified.
+.br
+If not provided, emulation starts from the current system time.
+.
+.TP
+\fB\-o\fI OFFSET\fR, \fB\-\-offset\fR=\fIOFFSET
+User offset in
+.RI [ +\- ] HH:mm:ss [ .SSS ]
+format, from
+.I \-23:59:59.999
+to
+.IR +23:59:59.999 .
+.br
+The starting point of the emulated time signal is adjusted by the
+specified time quantity.
+.br
+This option is useful for applying a timezone offset when the time base
+.RB ( \-b / \-\-base )
+is left at its default value.
+.br
+If not provided, no adjustment is applied.
+.
+.TP
+\fB\-d\fI DUT1\fR, \fB\-\-dut1\fR=\fIDUT1
+DUT1 value in milliseconds in
+.RI [ +\- ] SSS
+format, from
+.I \-999
+to
+.IR +999 .
+.br
+This option only applies when the time station being emulated
+.RI ( STATION )
+is
+.I MSF
+or
+.IR WWVB .
+.br
+If not provided, the DUT1 value is
+.IR 0 .
+.
+.SS Timeout options
+.
+.TP
+\fB\-t\fI TIMEOUT\fR, \fB\-\-timeout\fR=\fITIMEOUT
+Time to run before exiting in
+.I HH:MM:ss
+format, from
+.I 00:00:01
+to
+.IR 23:59:59 .
+.br
+If not provided, there is no timeout.
+.
+.SS Sound options (rarely needed)
+.
+.P
+Most of these options exist to support niche use cases and should not be
+provided unless absolutely necessary; for example, exclusive\-mode ALSA
+output directly to a secondary hardware sound device may require a
+particular sample format, sample rate, and channel count.
+.
+.P
+That said, consider providing
+.BR \-S / \-\-smooth
+if the receiving clock can tolerate its effects and
+.B timesignal
+will run for an extended period of time.
+.
+.P
+.BR \-a / \-\-audible
+may be worth a few minutes of entertainment as well.
+.
+.TP
+\fB\-m\fI METHOD\fR, \fB\-\-method\fR=\fIMETHOD
+Output method.
+.br
+This may be
+.I PipeWire
+(also
+.IR pw ),
+.I PulseAudio
+(also
+.IR pa ),
+or
+.IR ALSA .
+.br
+In general, it is better to output to a sound server (PipeWire or
+PulseAudio) if one is installed.
+.br
+If not provided, the output method is automatically detected.
+.
+.TP
+\fB\-D\fI DEVICE\fR, \fB\-\-device\fR=\fIDEVICE
+Output device.
+.br
+This is a raw ALSA device name, so this option only applies when the
+output method
+.RB ( \-m / \-\-method )
+is
+.IR ALSA .
+.br
+(PipeWire/PulseAudio have their own output device selection facilities.)
+.br
+Valid ALSA device names can be found with the
+.I aplay\~-L
+command.
+.br
+If not provided, the output device is
+.IR default .
+.
+.TP
+\fB\-f\fI FORMAT\fR, \fB\-\-format\fR=\fIFORMAT
+Output sample format.
+.br
+This may be
+.IR S16 ,
+.IR S16_LE ,
+.IR S16_BE ,
+.IR S24 ,
+.IR S24_LE ,
+.IR S24_BE ,
+.IR S32 ,
+.IR S32_LE ,
+.IR S32_BE ,
+.IR U16 ,
+.IR U16_LE ,
+.IR U16_BE ,
+.IR U24 ,
+.IR U24_LE ,
+.IR U24_BE ,
+.IR U32 ,
+.IR U32_LE ,
+.IR U32_BE ,
+.IR FLOAT ,
+.IR FLOAT_LE ,
+.IR FLOAT_BE ,
+.IR FLOAT64 ,
+.IR FLOAT64_LE ,
+or
+.IR FLOAT64_BE .
+.br
+If not provided, the output format is
+.I S16
+(signed 16\-bit machine endian).
+.
+.TP
+\fB\-r\fI RATE\fR, \fB\-\-rate\fR=\fIRATE
+Output sample rate.
+.br
+This may be
+.IR 44100 ,
+.IR 48000 ,
+.IR 88200 ,
+.IR 96000 ,
+.IR 176400 ,
+.IR 192000 ,
+.IR 352800 ,
+or
+.IR 384000 .
+.br
+If not provided, the output sample rate is
+.IR 48000 .
+.
+.TP
+\fB\-c\fI CHANNELS\fR, \fB\-\-channels\fR=\fICHANNELS
+Output channels, from
+.I 1
+to
+.IR 1023 .
+.br
+If not provided, the number of output channels is
+.IR 1 .
+.
+.TP
+\fB\-S\fR, \fB\-\-smooth\fR
+Smooth rapid gain changes in output waveform.
+.br
+This \(lqsoftens the edges\(rq of the waveform, thus preventing any
+popping/clipping in the output that could damage audio equipment over an
+extended period of time.
+.br
+Providing this option may cause some clocks to fail to synchronize.
+.br
+If not provided, gain smoothing is off.
+.
+.TP
+\fB\-u\fR, \fB\-\-ultrasound\fR
+Enable ultrasound output.
+.br
+This allows directly generating a time station\(aqs fundamental carrier
+frequency instead of an odd\-numbered subharmonic.
+.br
+For this option to work as intended, the output sample rate
+.RB ( \-r / \-\-rate )
+must be suitably high (at least
+.I 96000
+for JJY 40 kHz,
+.I 176400
+otherwise), the output hardware must support high sample rate playback
+without \(lqhelpfully\(rq filtering out the resulting ultrasound
+frequency, and PipeWire/PulseAudio/ALSA must be configured to use the
+high sample rate.
+.br
+Providing this option may benefit clock synchronization, but it may also
+.B damage audio equipment
+over an extended period of time.
+.br
+If not provided, ultrasound output is off.
+.
+.TP
+\fB\-a\fR, \fB\-\-audible\fR
+Make output waveform audible.
+.br
+This reduces the frequency of the output waveform so that the user can
+easily hear it.
+.br
+Providing this option
+.BR "will prevent clock synchronization" .
+.br
+If not provided, audible output is off.
+.
+.SS Configuration file options
+.
+.TP
+\fB\-C\fI CONFIG_FILE\fR, \fB\-\-config\fR=\fICONFIG_FILE
+Load options from a file.
+.br
+Options provided at the command line override those loaded from a file.
+.br
+See
+.BR timesignal.conf (5)
+for more details on the format.
+.br
+If not provided,
+.I /etc/timesignal.conf
+is used if it exists.
+.
+.SS Logging options
+.
+.TP
+\fB\-l\fI LOG_FILE\fR, \fB\-\-log\fR=\fILOG_FILE
+Log messages to a file.
+.br
+If not provided, log messages are not emitted to a file.
+.
+.TP
+\fB\-L\fR, \fB\-\-syslog\fR
+Log messages to syslog.
+.br
+If not provided, log messages are not emitted to syslog.
+.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+Increase logging verbosity.
+.br
+This also shows more information about what is being transmitted if
+.B timesignal
+is running within an interactive console session.
+.br
+If not provided, logging verbosity is not increased.
+.
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Suppress logging to console.
+.br
+This prevents log messages from being emitted to
+.IR stdout / stderr
+entirely, regardless of whether
+.B timesignal
+is running in a console session.
+.br
+Logging to a file and/or to syslog are not affected.
+.br
+If not provided, logging to console is on.
+.
+.SS Miscellaneous
+.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Show a help message and exit.
+.
+.TP
+\fB\-H\fR, \fB\-\-longhelp\fR
+Show a more detailed help message and exit.
+.
+.
+.SH FILES
+.
+.nf
+.I /usr/bin/timesignal
+.I /etc/timesignal.conf
+.fi
+.
+.
+.SH WARNING
+.
+.P
+When using
+.B timesignal
+with speakers,
+.BR "DO NOT PLACE YOUR EARS NEAR THE SPEAKERS" .
+.
+.P
+The generated audio has full dynamic range, but is pitched high enough to
+be difficult to perceive.
+.
+.P
+.BR "Even if you can\(aqt hear anything" ,
+some equipment is capable of playing it back loud enough to potentially
+cause
+.BR "PERMANENT HEARING DAMAGE" .
+.
+.
+.SH EXAMPLES
+.
+.IP "1."
+Emulate WWVB.
+.
+.IP
+.in +4
+.EX
+timesignal
+.EE
+.in
+.
+.IP "2."
+Emulate JJY 60 kHz with verbose logging.
+.
+.IP
+.in +4
+.EX
+timesignal\~\-v\~\-t\~00:30\~JJY60
+.EE
+.in
+.
+.IP "3."
+Emulate DCF77 for 30 minutes. Log to a file but not to console.
+.
+.IP
+.in +4
+.EX
+timesignal\~\-t\~30:00\~\-l\~/var/log/timesignal.log\~\-q\~DCF77
+.EE
+.in
+.
+.IP
+This example might be relevant to a periodically started
+.BR cron (8)
+job.
+.
+.IP "4."
+Emulate MSF with a +09:00 UTC offset.
+.
+.IP
+.in +4
+.EX
+timesignal\~\-o\~+09:00\~MSF
+.EE
+.in
+.
+.IP
+This example might be relevant to an overseas trip during the month of
+July to Sydney, NSW, Australia with a watch purchased in the United
+Kingdom that expects to synchronize to MSF.
+.
+.IP
+The offset is calculated as the difference between the respective
+timezones of the clock/receiver and the time encoded within the time
+signal by the station/transmitter, in this case AEST (UTC+10:00) and BST
+(UTC+01:00).
+.
+.IP
+Note that the offset would be +11:00 in January, as that is the time
+difference between AEDT (UTC+11:00) and GMT (UTC+00:00)!
+.
+.
+.SH SEE ALSO
+.
+.P
+.BR timesignal.conf (5)
+.
+.P
+<\c
+.UR __URL__
+.UE >

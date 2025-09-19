@@ -1,0 +1,372 @@
+.\" SPDX-License-Identifier: GPL-3.0-or-later
+.\"
+.\" timesignal.conf.5: Man page.
+.\"
+.\" This file is part of timesignal.
+.\"
+.\" Copyright © 2025 James Seo <james@equiv.tech>
+.
+.
+.TH TIMESIGNAL.CONF 5 "18 September 2025" "timesignal __VERSION__"
+.
+.
+.SH NAME
+.
+.P
+timesignal.conf \- configuration file for
+.BR timesignal (1)
+.
+.
+.SH SYNOPSIS
+.
+.P
+.nf
+.I /etc/timesignal.conf
+.fi
+.
+.
+.SH DESCRIPTION
+.
+.P
+.BR timesignal (1)
+can obtain its options from a configuration file.
+.
+.P
+By default, it looks
+for this file at
+.IR /etc/timesignal.conf ,
+although this can be changed using the
+.RB ( \-c / \-\-config )
+command\-line argument.
+.
+.P
+The format of the configuration file consists of a series of
+\fBOption\fR=\fIValue\fR assignments, one per line. This is similar to
+the format used in INI files, but even simpler in that
+.RB [ section ]
+headers are not supported.
+.
+.P
+The example below demonstrates all the essential features of the format:
+.
+.EX
+.IP
+# Everything on a line after \(lq#\(rq is a comment.
+# Comments and blank lines are ignored.
+.
+.IP
+# Option assignments have an option name,
+# \(lq=\(rq as a separator, and an option value.
+\fBOption\fR=\fIValue\fR
+.
+.IP
+# Values may be quoted in regular (non\-curly) single or double quotes.
+# They may also contain spaces, even if not quoted.
+\fBOption\fR=\fI\(dqValue with spaces\(dq\fR
+\fBOption\fR=\fI\(aqValue with spaces\(aq\fR
+\fBOption\fR=\fIValue with spaces\fR
+.
+.IP
+# A few options do not require specifying an option value.
+# For such options, the value \fIOn\fR is implied.
+\fBOption\fR
+\fBOption\fR=\fIOn\fR
+.
+.IP
+# Finally, option names and most option values
+# (except for filenames) are not case\-sensitive.
+\fBOption\fR=\fIValue\fR
+\fBOPTION\fR=\fIVALUE\fR
+\fBoption\fR=\fIvalue\fR
+.EE
+.
+.
+.SH OPTIONS
+.
+.P
+Below are the options recognized in a configuration file, along with
+brief descriptions, allowed values, and defaults. Options require values
+unless otherwise specified. Some options default to special values that
+cannot be explicitly set in a configuration file.
+.
+.P
+Each configuration file option corresponds exactly to a command\-line
+option. See
+.BR timesignal (1)
+for more details than may be shown here.
+.
+.SS Time station selection
+.
+.TP
+.B station
+Time station to emulate.
+.br
+May be
+.IR BPC ,
+.IR DCF77 ,
+.IR JJY ,
+.IR JJY60 ,
+.IR MSF ,
+or
+.IR WWVB .
+.br
+Default is
+.IR WWVB .
+.
+.SS Time signal options
+.
+.TP
+.B base
+Time base.
+.br
+Date and time in
+.IR "YYYY\-MM\-DD HH:mm:ss" [ (+\-)hhmm ]
+format, from
+.I 1970\-01\-01 00:00:00+0000
+to
+.IR "9999\-12\-31 23:59:59+2359" .
+.br
+Default is the current system time (special value).
+.
+.TP
+.B offset
+User offset.
+.br
+Time quantity in
+.RI [ +\- ] HH:mm:ss [ .SSS ]
+format, from
+.I \-23:59:59.999
+to
+.IR +23:59:59.999 .
+.br
+Default is
+.IR 00:00:00.000 .
+.
+.TP
+.B dut1
+DUT1 value (only for MSF and WWVB).
+.br
+Number of milliseconds in
+.RI [ +\- ] SSS
+format, from
+.I \-999
+to
+.IR +999 .
+.br
+Default is
+.IR 0 .
+.
+.SS Timeout options
+.
+.TP
+.B timeout
+Time to run before exiting.
+.br
+Time quantity in
+.I HH:mm:ss
+format, from
+.I 00:00:01
+to
+.IR 23:59:59 .
+.br
+Default is forever (special value).
+.
+.
+.SS Sound options (rarely needed)
+.
+.TP
+.B method
+Output method.
+.br
+May be
+.IR PipeWire ,
+.IR PulseAudio ,
+or
+.IR ALSA .
+.br
+Default is autodetect (special value).
+.
+.TP
+.B device
+Output device (only for ALSA).
+.br
+ALSA device name.
+.br
+Default is
+.IR default .
+.
+.TP
+.B format
+Output sample format.
+.br
+May be
+.IR S16 ,
+.IR S16_LE ,
+.IR S16_BE ,
+.IR S24 ,
+.IR S24_LE ,
+.IR S24_BE ,
+.IR S32 ,
+.IR S32_LE ,
+.IR S32_BE ,
+.IR U16 ,
+.IR U16_LE ,
+.IR U16_BE ,
+.IR U24 ,
+.IR U24_LE ,
+.IR U24_BE ,
+.IR U32 ,
+.IR U32_LE ,
+.IR U32_BE ,
+.IR FLOAT ,
+.IR FLOAT_LE ,
+.IR FLOAT_BE ,
+.IR FLOAT64 ,
+.IR FLOAT64_LE ,
+or
+.IR FLOAT64_BE .
+.br
+Default is
+.IR S16 .
+.
+.TP
+.B rate
+Output sample rate.
+.br
+May be
+.IR 44100 ,
+.IR 48000 ,
+.IR 88200 ,
+.IR 96000 ,
+.IR 176400 ,
+.IR 192000 ,
+.IR 352800 ,
+or
+.IR 384000 .
+.br
+Default is
+.IR 48000 .
+.
+.TP
+.B channels
+Output channels.
+.br
+Number of channels, from
+.I 1
+to
+.IR 1023 .
+.br
+Default is
+.IR 1 .
+.
+.TP
+.B smooth
+Smooth rapid gain changes in output waveform.
+.br
+Does not require a value.
+.br
+May be
+.IR On ,
+.IR Off ,
+or not provided (same effect as
+.IR On ).
+.br
+Default is
+.IR Off .
+.
+.TP
+.B ultrasound
+Enable ultrasound output
+.RB ( "MAY DAMAGE EQUIPMENT" ).
+.br
+Does not require a value.
+.br
+May be
+.IR On ,
+.IR Off ,
+or not provided (same effect as
+.IR On ).
+.br
+Default is
+.IR Off .
+.
+.TP
+.B audible
+Make output waveform audible (for entertainment only).
+.br
+Does not require a value.
+.br
+May be
+.IR On ,
+.IR Off ,
+or not provided (same effect as
+.IR On ).
+.br
+Default is
+.IR Off .
+.
+.SS Logging options
+.
+.TP
+.B log
+Log messages to a file.
+.br
+Path to a file.
+.br
+Default is none (special value).
+.
+.TP
+.B syslog
+Log messages to syslog.
+.br
+Does not require a value.
+.br
+May be
+.IR On ,
+.IR Off ,
+or not provided (same effect as
+.IR On ).
+.br
+Default is
+.IR Off .
+.
+.TP
+.B verbose
+Increase logging verbosity.
+.br
+Does not require a value.
+.br
+May be
+.IR On ,
+.IR Off ,
+or not provided (same effect as
+.IR On ).
+.br
+Default is
+.IR Off .
+.
+.TP
+.B quiet
+Suppress logging to console (and only console).
+.br
+Does not require a value.
+.br
+May be
+.IR On ,
+.IR Off ,
+or not provided (same effect as
+.IR On ).
+.br
+Default is
+.IR Off .
+.
+.
+.SH SEE ALSO
+.
+.P
+.BR timesignal (1)
+.
+.P
+<\c
+.UR __URL__
+.UE >

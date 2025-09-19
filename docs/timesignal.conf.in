@@ -1,0 +1,133 @@
+################################################################################
+# timesignal.conf: Configuration file for timesignal.
+################################################################################
+#
+# See timesignal(8) and timesignal.conf(5) for more information,
+# or visit <__URL__>.
+#
+# Options, allowed values, and defaults are provided below as comments.
+# Uncomment and modify those option entries that pertain to your needs.
+# Some options default to special values that cannot be explicitly set.
+#
+
+################################################################################
+# Time station selection
+################################################################################
+# Option name:     station
+# Description:     Time station to emulate.
+# Allowed values:  BPC, DCF77, JJY, JJY60, MSF, WWVB
+# Default:         WWVB
+#station=WWVB
+
+################################################################################
+# Time signal options
+################################################################################
+# Option name:     base
+# Description:     Time base.
+# Allowed values:  Date and time in YYYY-MM-DD HH:mm:ss[(+-)hhmm] format,
+#                  from 1970-01-01 00:00:00+0000 to 9999-12-31 23:59:59+2359.
+# Default:         Current system time (special value).
+#base=2099-12-31 12:34:56-1100
+
+# Option name:     offset
+# Description:     User offset.
+# Allowed values:  Time quantity in [+-]HH:mm:ss[.SSS] format,
+#                  from -23:59:59.999 to +23:59:59.999.
+# Default:         00:00:00.000
+#offset=00:00:00.000
+
+# Option name:     dut1
+# Description:     DUT1 value (only for MSF and WWVB).
+# Allowed values:  Number of milliseconds in [+-]SSS format, from -999 to +999.
+# Default:         0
+#dut1=0
+
+################################################################################
+# Timeout options
+################################################################################
+# Option name:     timeout
+# Description:     Time to run before exiting.
+# Allowed values:  Time quantity in HH:mm:ss format, from 00:00:01 to 23:59:59.
+# Default:         Forever (special value).
+#timeout=01:30:00
+
+################################################################################
+# Sound options (rarely needed)
+################################################################################
+# Option name:     method
+# Description:     Output method.
+# Allowed values:  PipeWire, PulseAudio, ALSA
+# Default:         Autodetect (special value).
+#method=PipeWire
+
+# Option name:     device
+# Description:     Output device (only for ALSA).
+# Allowed values:  ALSA device name.
+# Default:         default.
+#device=PipeWire
+
+# Option name:     format
+# Description:     Output sample format.
+# Allowed values:  S16, S16_LE, S16_BE, U16, U16_LE, U16_BE,
+#                  S24, S24_LE, S24_BE, U24, U24_LE, U24_BE,
+#                  S32, S32_LE, S32_BE, U32, U32_LE, U32_BE,
+#                  FLOAT, FLOAT_LE, FLOAT_BE, FLOAT64, FLOAT64_LE, FLOAT64_BE
+# Default:         S16
+#format=S16
+
+# Option name:     rate
+# Description:     Output sample rate.
+# Allowed values:  44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000
+# Default:         48000
+#rate=48000
+
+# Option name:     channels
+# Description:     Output channels.
+# Allowed values:  Number of channels, from 1 to 1023.
+# Default:         1
+#channels=1
+
+# Option name:     smooth
+# Description:     Smooth rapid gain changes in output waveform.
+# Allowed values:  On, Off, no value (same effect as On).
+# Default:         Off
+#smooth=On
+
+# Option name:     ultrasound
+# Description:     Enable ultrasound output (MAY DAMAGE EQUIPMENT).
+# Allowed values:  On, Off, no value (same effect as On).
+# Default:         Off
+#ultrasound=Off
+
+# Option name:     audible
+# Description:     Make output waveform audible (for entertainment only).
+# Allowed values:  On, Off, no value (same effect as On).
+# Default:         Off
+#audible
+
+################################################################################
+# Logging options
+################################################################################
+# Option name:     log
+# Description:     Log messages to a file.
+# Allowed values:  Path to a file.
+# Default:         None (special value).
+#log=/var/log/timesignal.conf
+
+# Option name:     syslog
+# Description:     Log messages to syslog.
+# Allowed values:  On, off, no value (same effect as On).
+# Default:         Off
+#syslog=On
+
+# Option name:     verbose
+# Description:     Increase logging verbosity.
+# Allowed values:  On, off, no value (same effect as On).
+# Default:         Off
+#verbose=Off
+
+# Option name:     quiet
+# Description:     Suppress logging to console (and only console).
+# Allowed values:  On, off, no value (same effect as On).
+# Default:         Off
+#quiet
