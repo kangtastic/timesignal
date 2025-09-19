@@ -58,20 +58,24 @@ $(LDFLAGS) \
 $(if $(filter $(call testname,$(1)),$(MOCK_LOG)),$(LDFLAGS_MOCK_LOG),)
 endef
 
+.PHONY:           all
 all:              tests
 
+.PHONY:           clean distclean
 clean:
 	rm -rf $(BUILDDIR) $(TESTS)
 
 distclean:        clean
 	rm -rf $(CMOCKABUILDDIR)
 
+.PHONY:           tests tests-asan
 tests:            clean $(TESTS)
 
 tests-asan:       CFLAGS += -fsanitize=address
 tests-asan:       LIBS := -fsanitize=address $(LIBS)
 tests-asan:       tests
 
+.PHONY:           run-tests run-tests-asan
 run-tests:        tests
 	for test_exe in $(TESTS); do \
 		./$$test_exe || exit $$?; \
@@ -92,5 +96,3 @@ $(CMOCKABUILDDIR):
 
 test_%:           $(BUILDDIR)/test_%.o
 	$(CC) $< -o $@ $(call ldflags,$@) $(LIBS)
-
-.PHONY:           all clean distclean tests tests-asan run-tests run-tests-asan
