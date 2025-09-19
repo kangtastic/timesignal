@@ -34,12 +34,14 @@ $(error "Cannot find libpipewire-0.3, libpulse, or alsa.")
 endif
 
 PREFIX            ?= /usr
-SBIN              := $(PREFIX)/sbin
+BINDIR            := $(PREFIX)/bin
 
 TARGET            := timesignal
 BUILDDIR          := build
-SRCDIR            := src
+DOCSDIR           := docs
 INCDIR            := include
+SRCDIR            := src
+TESTSDIR          := tests
 
 CC                ?= gcc
 STRIP             ?= strip
@@ -88,8 +90,10 @@ ifeq (yes,$(shell [ $(HAVE_BACKENDS) -ge 2 ] && echo yes))
 CFLAGS_EXTRA      += -DTSIG_HAVE_BACKENDS
 endif
 
-all:              $(TARGET)
+.PHONY:           all
+all:              strip docs
 
+.PHONY:           debug debug-asan
 debug:            CFLAGS := $(filter-out -O%,$(CFLAGS)) $(CFLAGS_DEBUG)
 debug:            clean $(TARGET)
 
@@ -106,27 +110,35 @@ $(BUILDDIR)/%.o:  $(SRCDIR)/%.c | $(BUILDDIR)
 $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
 
+.PHONY:           strip
 strip:            $(TARGET)
 	$(STRIP) --strip-unneeded $(TARGET)
 
+.PHONY:           docs
+docs:
+	$(MAKE) -C docs
+
+.PHONY:           tests run-tests
 tests:
-	$(MAKE) -C tests
+	$(MAKE) -C $(TESTSDIR)
 
 run-tests:        tests
-	$(MAKE) -C tests run-tests
+	$(MAKE) -C $(TESTSDIR) run-tests
 
+.PHONY:           clean distclean
 clean:
 	rm -rf $(BUILDDIR) $(TARGET)
-	$(MAKE) -C tests clean
+	$(MAKE) -C $(DOCSDIR) clean
+	$(MAKE) -C $(TESTSDIR) clean
 
-distclean: clean
-	$(MAKE) -C tests distclean
+distclean:        clean
+	$(MAKE) -C $(TESTSDIR) distclean
 
-install:          $(TARGET)
-	install -d $(DESTDIR)$(SBIN)
-	install -D -m 755 $(TARGET) $(DESTDIR)$(SBIN)/$(TARGET)
+.PHONY:           install uninstall
+install:          strip docs
+	install -D -m 755 $(TARGET) $(DESTDIR)$(BINDIR)/$(TARGET)
+	$(MAKE) -C $(DOCSDIR) install
 
 uninstall:
-	rm -f $(DESTDIR)$(SBIN)/$(TARGET)
-
-.PHONY:           all debug debug-asan strip tests run-tests clean distclean install uninstall
+	rm -f $(DESTDIR)$(BINDIR)/$(TARGET)
+	$(MAKE) -C $(DOCSDIR) uninstall

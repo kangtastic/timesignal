@@ -53,7 +53,7 @@ clean:
 install:           all
 	install -D -m 644 $(BUILDDIR)/timesignal.1.gz $(DESTDIR)$(MAN1DIR)/timesignal.1.gz
 	install -D -m 644 $(BUILDDIR)/timesignal.conf.5.gz $(DESTDIR)$(MAN5DIR)/timesignal.conf.5.gz
-	install --backup=numbered -C -m 644 $(BUILDDIR)/timesignal.conf $(DESTDIR)$(ETCDIR)/timesignal.conf
+	install --backup=numbered -C -D -m 644 $(BUILDDIR)/timesignal.conf $(DESTDIR)$(ETCDIR)/timesignal.conf
 
 uninstall:
 	rm -f $(DESTDIR)$(MAN1DIR)/timesignal.1.gz
