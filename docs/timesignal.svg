@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18">
+  <rect width="8" height="4" x="5" y="0" fill="#fefefe" fill-opacity="0.5" />
+  <rect width="10" height="1" x="4" y="4" fill="#fefefe" fill-opacity="0.5" />
+  <rect width="12" height="2" x="3" y="5" fill="#fefefe" fill-opacity="0.5" />
+  <rect width="13" height="4" x="3" y="7" fill="#fefefe" fill-opacity="0.5" />
+  <rect width="12" height="2" x="3" y="11" fill="#fefefe" fill-opacity="0.5" />
+  <rect width="10" height="1" x="4" y="13" fill="#fefefe" fill-opacity="0.5" />
+  <rect width="8" height="4" x="5" y="14" fill="#fefefe" fill-opacity="0.5" />
+
+  <rect width="6" height="8" x="6" y="5" fill="#fefefe" />
+  <rect width="8" height="6" x="5" y="6" fill="#fefefe" />
+  <rect width="1" height="6" x="4" y="6" fill="#000000" />
+  <rect width="1" height="1" x="5" y="5" fill="#000000" />
+  <rect width="1" height="1" x="5" y="12" fill="#000000" />
+  <rect width="6" height="4" x="6" y="1" fill="#000000" />
+  <rect width="6" height="4" x="6" y="13" fill="#000000" />
+  <rect width="3" height="1" x="7" y="9" fill="#000000" />
+  <rect width="1" height="1" x="12" y="5" fill="#000000" />
+  <rect width="1" height="1" x="12" y="12" fill="#000000" />
+  <rect width="1" height="6" x="13" y="6" fill="#000000" />
+  <rect width="1" height="2" x="14" y="8" fill="#000000" />
+
+  <rect width="1" height="2" x="9" y="7" fill="#000000" visibility="hidden">
+    <set id="a" attributeName="visibility" to="visible" begin="0s;a.begin+2s" dur="0.25s" fill="remove" />
+  </rect>
+
+  <rect width="1" height="1" x="10" y="8" fill="#000000" visibility="hidden">
+    <set id="b" attributeName="visibility" to="visible" begin="0.25s;b.begin+2s" dur="0.25s" fill="remove" />
+  </rect>
+  <rect width="1" height="1" x="11" y="7" fill="#000000" visibility="hidden">
+    <set attributeName="visibility" to="visible" begin="0.25s;b.begin+2s" dur="0.25s" fill="remove" />
+  </rect>
+
+  <rect width="2" height="1" x="10" y="9" fill="#000000" visibility="hidden">
+    <set id="c" attributeName="visibility" to="visible" begin="0.5s;c.begin+2s" dur="0.25s" fill="remove" />
+  </rect>
+
+  <rect width="1" height="1" x="10" y="10" fill="#000000" visibility="hidden">
+    <set id="d" attributeName="visibility" to="visible" begin="0.75s;d.begin+2s" dur="0.25s" fill="remove" />
+  </rect>
+
+  <rect width="1" height="2" x="9" y="10" fill="#000000" visibility="hidden">
+    <set id="e" attributeName="visibility" to="visible" begin="1s;e.begin+2s" dur="0.25s" fill="remove" />
+  </rect>
+
+  <rect width="1" height="1" x="7" y="11" fill="#000000" visibility="hidden">
+    <set id="f" attributeName="visibility" to="visible" begin="1.25s;f.begin+2s" dur="0.25s" fill="remove" />
+  </rect>
+  <rect width="1" height="1" x="8" y="10" fill="#000000" visibility="hidden">
+    <set attributeName="visibility" to="visible" begin="1.25s;f.begin+2s" dur="0.25s" fill="remove" />
+  </rect>
+
+  <rect width="1" height="1" x="6" y="9" fill="#000000" visibility="hidden">
+    <set id="g" attributeName="visibility" to="visible" begin="1.5s;g.begin+2s" dur="0.25s" fill="remove" />
+  </rect>
+
+  <rect width="1" height="1" x="7" y="7" fill="#000000" visibility="hidden">
+    <set id="h" attributeName="visibility" to="visible" begin="1.75s;h.begin+2s" dur="0.25s" fill="remove" />
+  </rect>
+  <rect width="1" height="1" x="8" y="8" fill="#000000" visibility="hidden">
+    <set attributeName="visibility" to="visible" begin="1.75s;h.begin+2s" dur="0.25s" fill="remove" />
+  </rect>
+</svg>
