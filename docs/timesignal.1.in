@@ -440,63 +440,59 @@ cause
 .
 .SH EXAMPLES
 .
-.IP "1."
-Emulate WWVB.
+.SS Emulate WWVB
 .
-.IP
+.P
 .in +4
 .EX
 timesignal
 .EE
 .in
 .
-.IP "2."
-Emulate JJY 60 kHz with verbose logging.
+.SS Emulate JJY 60 kHz with verbose logging
 .
-.IP
+.P
 .in +4
 .EX
-timesignal\~\-v\~\-t\~00:30\~JJY60
+timesignal\~\-v\~JJY60
 .EE
 .in
 .
-.IP "3."
-Emulate DCF77 for 30 minutes. Log to a file but not to console.
+.SS Emulate DCF77 for 30 minutes, log to a file but not to console
 .
-.IP
+.P
 .in +4
 .EX
 timesignal\~\-t\~30:00\~\-l\~/var/log/timesignal.log\~\-q\~DCF77
 .EE
 .in
 .
-.IP
+.P
 This example might be relevant to a periodically started
 .BR cron (8)
 job.
 .
-.IP "4."
-Emulate MSF with a +09:00 UTC offset.
+.SS Emulate MSF with a +09:00 UTC offset
 .
-.IP
+.P
 .in +4
 .EX
 timesignal\~\-o\~+09:00\~MSF
 .EE
 .in
 .
-.IP
+.P
 This example might be relevant to an overseas trip during the month of
 July to Sydney, NSW, Australia with a watch purchased in the United
 Kingdom that expects to synchronize to MSF.
 .
-.IP
+.P
 The offset is calculated as the difference between the respective
 timezones of the clock/receiver and the time encoded within the time
 signal by the station/transmitter, in this case AEST (UTC+10:00) and BST
 (UTC+01:00).
 .
-.IP
+.P
 Note that the offset would be +11:00 in January, as that is the time
 difference between AEDT (UTC+11:00) and GMT (UTC+00:00)!
 .
