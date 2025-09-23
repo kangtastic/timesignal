@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!--
+
+  timesignal.conf.5.html: Man page for timesignal.conf rendered to HTML.
+
+  This file is part of timesignal.
+
+  Copyright © 2025 James Seo <james@equiv.tech>
+
+-->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="timesignal.css" type="text/css" media="all" />
+    <title>TIMESIGNAL.CONF(5)</title>
+  </head>
+  <body>
+    <table class="head">
+      <tr>
+        <td class="head-ltitle">TIMESIGNAL.CONF(5)</td>
+        <td class="head-vol">File Formats Manual</td>
+        <td class="head-rtitle">TIMESIGNAL.CONF(5)</td>
+      </tr>
+    </table>
+    <div class="manual-text">
+      <section class="Sh">
+        <h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+        <p class="Pp">
+          timesignal.conf - configuration file for
+          <a href="timesignal.1.html"><b>timesignal</b>(1)</a>
+        </p>
+      </section>
+      <section class="Sh">
+        <h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+        <pre><i>/etc/timesignal.conf</i></pre>
+      </section>
+      <section class="Sh">
+        <h1 class="Sh" id="DESCRIPTION">
+          <a class="permalink" href="#DESCRIPTION">DESCRIPTION</a>
+        </h1>
+        <p class="Pp">
+          <a href="timesignal.1.html"><b>timesignal</b>(1)</a> can obtain its options from a
+          configuration file.
+        </p>
+        <p class="Pp">
+          By default, it looks for this file at <i>/etc/timesignal.conf</i>, although this can be
+          changed using the <a href="timesignal.1.html#C"><b>-C</b>/<b>--config</b></a> command-line
+          argument.
+        </p>
+        <p class="Pp">
+          The format of the configuration file consists of a series of <b>Option</b>=<i>Value</i>
+          assignments, one per line. This is similar to the format used in INI files, but even
+          simpler in that [<b>section</b>] headers are not supported.
+        </p>
+        <p class="Pp">The example below demonstrates all the essential features of the format:</p>
+        <dl class="Bl-tag">
+          <dt></dt>
+          <dd>
+            <pre>
+# Everything on a line after &#x201C;#&#x201D; is a comment.
+# Comments and blank lines are ignored.</pre
+            >
+          </dd>
+          <dt></dt>
+          <dd>
+            <pre># Option assignments have an option name,
+# &#x201C;=&#x201D; as a separator, and an option value.
+<b>Option</b>=<i>Value</i></pre>
+          </dd>
+          <dt></dt>
+          <dd>
+            <pre># Values may be quoted in regular (non-curly) single or double quotes.
+# They may also contain spaces, even if not quoted.
+<b>Option</b>=<i>&quot;Value with spaces&quot;</i>
+<b>Option</b>=<i>'Value with spaces'</i>
+<b>Option</b>=<i>Value with spaces</i></pre>
+          </dd>
+          <dt></dt>
+          <dd>
+            <pre># A few options do not require specifying an option value.
+# For such options, the value <i>On</i> is implied.
+<b>Option</b>
+<b>Option</b>=<i>On</i></pre>
+          </dd>
+          <dt></dt>
+          <dd>
+            <pre>
+# Finally, option names and most option values
+# (except for filenames) are not case-sensitive.
+<b>Option</b>=<i>Value</i>
+<b>OPTION</b>=<i>VALUE</i>
+<b>option</b>=<i>value</i>
+    </pre
+            >
+          </dd>
+        </dl>
+      </section>
+      <section class="Sh">
+        <h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+        <p class="Pp">
+          Below are the options recognized in a configuration file, along with brief descriptions,
+          allowed values, and defaults. Options require values unless otherwise specified. Some
+          options default to special values that cannot be explicitly set in a configuration file.
+        </p>
+        <p class="Pp">
+          Each configuration file option corresponds exactly to a command-line option. See
+          <a href="timesignal.1.html"><b>timesignal</b>(1)</a> for more details than may be shown
+          here.
+        </p>
+        <section class="Ss">
+          <h2 class="Ss" id="Time_station_selection">
+            <a class="permalink" href="#Time_station_selection">Time station selection</a>
+          </h2>
+          <dl class="Bl-tag">
+            <dt id="station">
+              <a class="permalink" href="#station"><b>station</b></a>
+            </dt>
+            <dd>
+              Time station to emulate.
+              <br />
+              May be <i>BPC</i>, <i>DCF77</i>, <i>JJY</i>, <i>JJY60</i>, <i>MSF</i>, or <i>WWVB</i>.
+              <br />
+              Default is <i>WWVB</i>.
+            </dd>
+          </dl>
+        </section>
+        <section class="Ss">
+          <h2 class="Ss" id="Time_signal_options">
+            <a class="permalink" href="#Time_signal_options">Time signal options</a>
+          </h2>
+          <dl class="Bl-tag">
+            <dt id="base">
+              <a class="permalink" href="#base"><b>base</b></a>
+            </dt>
+            <dd>
+              Time base.
+              <br />
+              Date and time in <i>YYYY-MM-DD HH:mm:ss</i>[<i>(+-)hhmm</i>] format, from
+              <i>1970-01-01 00:00:00+0000</i> to <i>9999-12-31 23:59:59+2359</i>.
+              <br />
+              Default is the current system time (special value).
+            </dd>
+            <dt id="offset">
+              <a class="permalink" href="#offset"><b>offset</b></a>
+            </dt>
+            <dd>
+              User offset.
+              <br />
+              Time quantity in [<i>+-</i>]<i>HH:mm:ss</i>[<i>.SSS</i>] format, from
+              <i>-23:59:59.999</i> to <i>+23:59:59.999</i>.
+              <br />
+              Default is <i>00:00:00.000</i>.
+            </dd>
+            <dt id="dut1">
+              <a class="permalink" href="#dut1"><b>dut1</b></a>
+            </dt>
+            <dd>
+              DUT1 value (only for MSF and WWVB).
+              <br />
+              Number of milliseconds in [<i>+-</i>]<i>SSS</i> format, from <i>-999</i> to
+              <i>+999</i>.
+              <br />
+              Default is <i>0</i>.
+            </dd>
+          </dl>
+        </section>
+        <section class="Ss">
+          <h2 class="Ss" id="Timeout_options">
+            <a class="permalink" href="#Timeout_options">Timeout options</a>
+          </h2>
+          <dl class="Bl-tag">
+            <dt id="timeout">
+              <a class="permalink" href="#timeout"><b>timeout</b></a>
+            </dt>
+            <dd>
+              Time to run before exiting.
+              <br />
+              Time quantity in <i>HH:mm:ss</i> format, from <i>00:00:01</i> to <i>23:59:59</i>.
+              <br />
+              Default is forever (special value).
+            </dd>
+          </dl>
+        </section>
+        <section class="Ss">
+          <h2 class="Ss" id="Sound_options_(rarely_needed)">
+            <a class="permalink" href="#Sound_options_(rarely_needed)"
+              >Sound options (rarely needed)</a
+            >
+          </h2>
+          <dl class="Bl-tag">
+            <dt id="method">
+              <a class="permalink" href="#method"><b>method</b></a>
+            </dt>
+            <dd>
+              Output method.
+              <br />
+              May be <i>PipeWire</i>, <i>PulseAudio</i>, or <i>ALSA</i>.
+              <br />
+              Default is autodetect (special value).
+            </dd>
+            <dt id="device">
+              <a class="permalink" href="#device"><b>device</b></a>
+            </dt>
+            <dd>
+              Output device (only for ALSA).
+              <br />
+              ALSA device name.
+              <br />
+              Default is <i>default</i>.
+            </dd>
+            <dt id="format">
+              <a class="permalink" href="#format"><b>format</b></a>
+            </dt>
+            <dd>
+              Output sample format.
+              <br />
+              May be <i>S16</i>, <i>S16_LE</i>, <i>S16_BE</i>, <i>S24</i>, <i>S24_LE</i>,
+              <i>S24_BE</i>, <i>S32</i>, <i>S32_LE</i>, <i>S32_BE</i>, <i>U16</i>, <i>U16_LE</i>,
+              <i>U16_BE</i>, <i>U24</i>, <i>U24_LE</i>, <i>U24_BE</i>, <i>U32</i>, <i>U32_LE</i>,
+              <i>U32_BE</i>, <i>FLOAT</i>, <i>FLOAT_LE</i>, <i>FLOAT_BE</i>, <i>FLOAT64</i>,
+              <i>FLOAT64_LE</i>, or <i>FLOAT64_BE</i>.
+              <br />
+              Default is <i>S16</i>.
+            </dd>
+            <dt id="rate">
+              <a class="permalink" href="#rate"><b>rate</b></a>
+            </dt>
+            <dd>
+              Output sample rate.
+              <br />
+              May be <i>44100</i>, <i>48000</i>, <i>88200</i>, <i>96000</i>, <i>176400</i>,
+              <i>192000</i>, <i>352800</i>, or <i>384000</i>.
+              <br />
+              Default is <i>48000</i>.
+            </dd>
+            <dt id="channels">
+              <a class="permalink" href="#channels"><b>channels</b></a>
+            </dt>
+            <dd>
+              Output channels.
+              <br />
+              Number of channels, from <i>1</i> to <i>1023</i>.
+              <br />
+              Default is <i>1</i>.
+            </dd>
+            <dt id="smooth">
+              <a class="permalink" href="#smooth"><b>smooth</b></a>
+            </dt>
+            <dd>
+              Smooth rapid gain changes in output waveform.
+              <br />
+              Does not require a value.
+              <br />
+              May be <i>On</i>, <i>Off</i>, or not provided (same effect as <i>On</i>).
+              <br />
+              Default is <i>Off</i>.
+            </dd>
+            <dt id="ultrasound">
+              <a class="permalink" href="#ultrasound"><b>ultrasound</b></a>
+            </dt>
+            <dd>
+              Enable ultrasound output (<b>MAY DAMAGE EQUIPMENT</b>).
+              <br />
+              Does not require a value.
+              <br />
+              May be <i>On</i>, <i>Off</i>, or not provided (same effect as <i>On</i>).
+              <br />
+              Default is <i>Off</i>.
+            </dd>
+            <dt id="audible">
+              <a class="permalink" href="#audible"><b>audible</b></a>
+            </dt>
+            <dd>
+              Make output waveform audible (for entertainment only).
+              <br />
+              Does not require a value.
+              <br />
+              May be <i>On</i>, <i>Off</i>, or not provided (same effect as <i>On</i>).
+              <br />
+              Default is <i>Off</i>.
+            </dd>
+          </dl>
+        </section>
+        <section class="Ss">
+          <h2 class="Ss" id="Logging_options">
+            <a class="permalink" href="#Logging_options">Logging options</a>
+          </h2>
+          <dl class="Bl-tag">
+            <dt id="log">
+              <a class="permalink" href="#log"><b>log</b></a>
+            </dt>
+            <dd>
+              Log messages to a file.
+              <br />
+              Path to a file.
+              <br />
+              Default is none (special value).
+            </dd>
+            <dt id="syslog">
+              <a class="permalink" href="#syslog"><b>syslog</b></a>
+            </dt>
+            <dd>
+              Log messages to syslog.
+              <br />
+              Does not require a value.
+              <br />
+              May be <i>On</i>, <i>Off</i>, or not provided (same effect as <i>On</i>).
+              <br />
+              Default is <i>Off</i>.
+            </dd>
+            <dt id="verbose">
+              <a class="permalink" href="#verbose"><b>verbose</b></a>
+            </dt>
+            <dd>
+              Increase logging verbosity.
+              <br />
+              Does not require a value.
+              <br />
+              May be <i>On</i>, <i>Off</i>, or not provided (same effect as <i>On</i>).
+              <br />
+              Default is <i>Off</i>.
+            </dd>
+            <dt id="quiet">
+              <a class="permalink" href="#quiet"><b>quiet</b></a>
+            </dt>
+            <dd>
+              Suppress logging to console (and only console).
+              <br />
+              Does not require a value.
+              <br />
+              May be <i>On</i>, <i>Off</i>, or not provided (same effect as <i>On</i>).
+              <br />
+              Default is <i>Off</i>.
+            </dd>
+          </dl>
+        </section>
+      </section>
+      <section class="Sh">
+        <h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE ALSO</a></h1>
+        <p class="Pp">
+          <a href="timesignal.1.html"><b>timesignal</b>(1)</a>
+        </p>
+        <p class="Pp">
+          &lt;<a class="Lk" href="https://github.com/kangtastic/timesignal"
+            >https://github.com/kangtastic/timesignal</a
+          >&gt;
+        </p>
+      </section>
+    </div>
+    <table class="foot">
+      <tr>
+        <td class="foot-date">18 September 2025</td>
+        <td class="foot-os">timesignal 0.2.0</td>
+      </tr>
+    </table>
+  </body>
+</html>

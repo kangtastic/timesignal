@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!--
+
+  timesignal.1.html: Man page rendered to HTML.
+
+  This file is part of timesignal.
+
+  Copyright © 2025 James Seo <james@equiv.tech>
+
+-->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="timesignal.css" type="text/css" media="all" />
+    <title>TIMESIGNAL(1)</title>
+  </head>
+  <body>
+    <table class="head">
+      <tr>
+        <td class="head-ltitle">TIMESIGNAL(1)</td>
+        <td class="head-vol">General Commands Manual</td>
+        <td class="head-rtitle">TIMESIGNAL(1)</td>
+      </tr>
+    </table>
+    <div class="manual-text">
+      <section class="Sh">
+        <h1 class="Sh" id="NAME"><a class="permalink" href="#NAME">NAME</a></h1>
+        <p class="Pp">
+          timesignal - synchronize radio-controlled (&#x201C;atomic&#x201D;) clocks using speakers
+        </p>
+      </section>
+      <section class="Sh">
+        <h1 class="Sh" id="SYNOPSIS"><a class="permalink" href="#SYNOPSIS">SYNOPSIS</a></h1>
+        <table class="Nm">
+          <tr>
+            <td><code class="Nm">timesignal</code></td>
+            <td>[<i>OPTION</i>]... [<i>STATION</i>]</td>
+          </tr>
+        </table>
+      </section>
+      <section class="Sh">
+        <h1 class="Sh" id="DESCRIPTION">
+          <a class="permalink" href="#DESCRIPTION">DESCRIPTION</a>
+        </h1>
+        <p class="Pp">
+          <a href="https://github.com/kangtastic/timesignal"><b>timesignal</b></a> emulates radio
+          time signal broadcasts from
+          <a href="https://en.wikipedia.org/wiki/BPC_(time_signal)"><b>BPC</b></a
+          >, <a href="https://en.wikipedia.org/wiki/DCF77"><b>DCF77</b></a
+          >, <a href="https://en.wikipedia.org/wiki/JJY"><b>JJY</b></a
+          >, <a href="https://en.wikipedia.org/wiki/Time_from_NPL_(MSF)"><b>MSF</b></a
+          >, and <a href="https://en.wikipedia.org/wiki/WWVB"><b>WWVB</b></a
+          >.
+        </p>
+        <p class="Pp">
+          The vast majority of all radio-controlled clocks and watches (often marketed as
+          &#x201C;atomic clocks&#x201D;) rely a time signal broadcast from one of these five
+          stations. However, these broadcasts are limited in geographic range and notoriously prone
+          to interference in urban areas, so many such clocks end up never actually using their
+          self-setting functionality.
+        </p>
+        <p class="Pp">
+          <a href="https://github.com/kangtastic/timesignal"><b>timesignal</b></a> may allow setting
+          such clocks when/where a suitable signal is not otherwise available by generating an audio
+          waveform intentionally crafted to create, when played back through consumer-grade audio
+          hardware, the right kind of radio frequency (RF) noise to be mistaken for a time signal
+          broadcast.
+        </p>
+      </section>
+      <section class="Sh">
+        <h1 class="Sh" id="OPTIONS"><a class="permalink" href="#OPTIONS">OPTIONS</a></h1>
+        <p class="Pp">
+          Option <b>names</b> are case-sensitive, but option <i>values</i> are generally not; for
+          example, <i>WWVB</i> and <i>-m&#x00A0;PipeWire</i> are equivalent to <i>wwvb</i> and
+          <i>-m&#x00A0;pipewire</i>.
+        </p>
+        <p class="Pp">Not all option values work on all systems.</p>
+        <section class="Ss">
+          <h2 class="Ss" id="Time_station_selection">
+            <a class="permalink" href="#Time_station_selection">Time station selection</a>
+          </h2>
+          <p class="Pp">
+            The sole positional argument <i>STATION</i> is the name of the time station to emulate.
+          </p>
+          <p class="Pp">
+            This may be <i>BPC</i>, <i>DCF77</i>, <i>JJY</i>, <i>JJY60</i>, <i>MSF</i>, or
+            <i>WWVB</i>, corresponding to one of the supported time stations below:
+          </p>
+          <p class="Pp"></p>
+          <table class="tbl" border="1" style="border-style: solid">
+            <tr>
+              <td style="text-align: center"><b>Name</b></td>
+              <td style="text-align: center"><b>Location</b></td>
+              <td style="text-align: center"><b>Frequency</b></td>
+            </tr>
+            <tr>
+              <td>BPC</td>
+              <td>Shangqiu, Henan, China</td>
+              <td style="text-align: center">68.5 kHz</td>
+            </tr>
+            <tr>
+              <td>DCF77</td>
+              <td>Mainhausen, Hesse, Germany</td>
+              <td style="text-align: center">77.5 kHz</td>
+            </tr>
+            <tr>
+              <td>JJY</td>
+              <td>Tamura, Fukushima, Japan</td>
+              <td style="text-align: center">40 kHz</td>
+            </tr>
+            <tr>
+              <td>JJY60</td>
+              <td>Saga, Saga, Japan</td>
+              <td style="text-align: center">60 kHz</td>
+            </tr>
+            <tr>
+              <td>MSF</td>
+              <td>Anthorn, Cumbria, United Kingdom</td>
+              <td style="text-align: center">60 kHz</td>
+            </tr>
+            <tr>
+              <td>WWVB</td>
+              <td>Fort Collins, Colorado, United States</td>
+              <td style="text-align: center">60 kHz</td>
+            </tr>
+          </table>
+          <p class="Pp">If not provided, the time station to emulate is <i>WWVB</i>.</p>
+        </section>
+        <section class="Ss">
+          <h2 class="Ss" id="Time_signal_options">
+            <a class="permalink" href="#Time_signal_options">Time signal options</a>
+          </h2>
+          <dl class="Bl-tag">
+            <dt id="b">
+              <a class="permalink" href="#b"><b>-b</b><i> BASE</i>, <b>--base</b>=<i>BASE</i></a>
+            </dt>
+            <dd>
+              Time base in <i>YYYY-MM-DD HH:mm:ss</i>[<i>(+-)hhmm</i>] format, from
+              <i>&quot;1970-01-01 00:00:00+0000&quot;</i> to
+              <i>&quot;9999-12-31 23:59:59+2359&quot;</i>.
+              <br />
+              The emulated time signal starts from the date and time specified.
+              <br />
+              If not provided, emulation starts from the current system time.
+            </dd>
+            <dt id="o">
+              <a class="permalink" href="#o"
+                ><b>-o</b><i> OFFSET</i>, <b>--offset</b>=<i>OFFSET</i></a
+              >
+            </dt>
+            <dd>
+              User offset in [<i>+-</i>]<i>HH:mm:ss</i>[<i>.SSS</i>] format, from
+              <i>-23:59:59.999</i> to <i>+23:59:59.999</i>.
+              <br />
+              The starting point of the emulated time signal is adjusted by the specified time
+              quantity.
+              <br />
+              This option is useful for applying a timezone offset when the time base (<a href="#b"
+                ><b>-b</b>/<b>--base</b></a
+              >) is left at its default value.
+              <br />
+              If not provided, no adjustment is applied.
+            </dd>
+            <dt id="d">
+              <a class="permalink" href="#d"><b>-d</b><i> DUT1</i>, <b>--dut1</b>=<i>DUT1</i></a>
+            </dt>
+            <dd>
+              DUT1 value in milliseconds in [<i>+-</i>]<i>SSS</i> format, from <i>-999</i> to
+              <i>+999</i>.
+              <br />
+              This option only applies when the time station being emulated (<a
+                href="#Time_station_selection"
+                ><i>STATION</i></a
+              >) is <i>MSF</i> or <i>WWVB</i>.
+              <br />
+              If not provided, the DUT1 value is <i>0</i>.
+            </dd>
+          </dl>
+        </section>
+        <section class="Ss">
+          <h2 class="Ss" id="Timeout_options">
+            <a class="permalink" href="#Timeout_options">Timeout options</a>
+          </h2>
+          <dl class="Bl-tag">
+            <dt id="t">
+              <a class="permalink" href="#t"
+                ><b>-t</b><i> TIMEOUT</i>, <b>--timeout</b>=<i>TIMEOUT</i></a
+              >
+            </dt>
+            <dd>
+              Time to run before exiting in <i>HH:MM:ss</i> format, from <i>00:00:01</i> to
+              <i>23:59:59</i>.
+              <br />
+              If not provided, there is no timeout.
+            </dd>
+          </dl>
+        </section>
+        <section class="Ss">
+          <h2 class="Ss" id="Sound_options_(rarely_needed)">
+            <a class="permalink" href="#Sound_options_(rarely_needed)"
+              >Sound options (rarely needed)</a
+            >
+          </h2>
+          <p class="Pp">
+            Most of these options exist to support niche use cases and should not be provided unless
+            absolutely necessary; for example, exclusive-mode ALSA output directly to a secondary
+            hardware sound device may require a particular sample format, sample rate, and channel
+            count.
+          </p>
+          <p class="Pp">
+            That said, consider providing <a href="#S"><b>-S</b>/<b>--smooth</b></a> if the
+            receiving clock can tolerate its effects and
+            <a href="https://github.com/kangtastic/timesignal"><b>timesignal</b></a> will run for an
+            extended period of time.
+          </p>
+          <p class="Pp">
+            <a href="#a"><b>-a</b>/<b>--audible</b></a> may be worth a few minutes of entertainment
+            as well.
+          </p>
+          <dl class="Bl-tag">
+            <dt id="m">
+              <a class="permalink" href="#m"
+                ><b>-m</b><i> METHOD</i>, <b>--method</b>=<i>METHOD</i></a
+              >
+            </dt>
+            <dd>
+              Output method.
+              <br />
+              This may be <i>PipeWire</i> (also <i>pw</i>), <i>PulseAudio</i> (also <i>pa</i>), or
+              <i>ALSA</i>.
+              <br />
+              In general, it is better to output to a sound server (PipeWire or PulseAudio) if one
+              is installed.
+              <br />
+              If not provided, the output method is automatically detected.
+            </dd>
+            <dt id="D">
+              <a class="permalink" href="#D"
+                ><b>-D</b><i> DEVICE</i>, <b>--device</b>=<i>DEVICE</i></a
+              >
+            </dt>
+            <dd>
+              Output device.
+              <br />
+              This is a raw ALSA device name, so this option only applies when the output method (<a
+                href="#m"
+                ><b>-m</b>/<b>--method</b></a
+              >) is <i>ALSA</i>.
+              <br />
+              (PipeWire/PulseAudio have their own output device selection facilities.)
+              <br />
+              Valid ALSA device names can be found with the <i>aplay&#x00A0;-L</i>
+              command.
+              <br />
+              If not provided, the output device is <i>default</i>.
+            </dd>
+            <dt id="f">
+              <a class="permalink" href="#f"
+                ><b>-f</b><i> FORMAT</i>, <b>--format</b>=<i>FORMAT</i></a
+              >
+            </dt>
+            <dd>
+              Output sample format.
+              <br />
+              This may be <i>S16</i>, <i>S16_LE</i>, <i>S16_BE</i>, <i>S24</i>, <i>S24_LE</i>,
+              <i>S24_BE</i>, <i>S32</i>, <i>S32_LE</i>, <i>S32_BE</i>, <i>U16</i>, <i>U16_LE</i>,
+              <i>U16_BE</i>, <i>U24</i>, <i>U24_LE</i>, <i>U24_BE</i>, <i>U32</i>, <i>U32_LE</i>,
+              <i>U32_BE</i>, <i>FLOAT</i>, <i>FLOAT_LE</i>, <i>FLOAT_BE</i>, <i>FLOAT64</i>,
+              <i>FLOAT64_LE</i>, or <i>FLOAT64_BE</i>.
+              <br />
+              If not provided, the output format is <i>S16</i> (signed 16-bit machine endian).
+            </dd>
+            <dt id="r">
+              <a class="permalink" href="#r"><b>-r</b><i> RATE</i>, <b>--rate</b>=<i>RATE</i></a>
+            </dt>
+            <dd>
+              Output sample rate.
+              <br />
+              This may be <i>44100</i>, <i>48000</i>, <i>88200</i>, <i>96000</i>, <i>176400</i>,
+              <i>192000</i>, <i>352800</i>, or <i>384000</i>.
+              <br />
+              If not provided, the output sample rate is <i>48000</i>.
+            </dd>
+            <dt id="c">
+              <a class="permalink" href="#c"
+                ><b>-c</b><i> CHANNELS</i>, <b>--channels</b>=<i>CHANNELS</i></a
+              >
+            </dt>
+            <dd>
+              Output channels, from <i>1</i> to <i>1023</i>.
+              <br />
+              If not provided, the number of output channels is <i>1</i>.
+            </dd>
+            <dt id="S">
+              <a class="permalink" href="#S"><b>-S</b>, <b>--smooth</b></a>
+            </dt>
+            <dd>
+              Smooth rapid gain changes in output waveform.
+              <br />
+              This &#x201C;softens the edges&#x201D; of the waveform, thus preventing any
+              popping/clipping in the output that could damage audio equipment over an extended
+              period of time.
+              <br />
+              Providing this option may cause some clocks to fail to synchronize.
+              <br />
+              If not provided, gain smoothing is off.
+            </dd>
+            <dt id="u">
+              <a class="permalink" href="#u"><b>-u</b>, <b>--ultrasound</b></a>
+            </dt>
+            <dd>
+              Enable ultrasound output.
+              <br />
+              This allows directly generating a time station's fundamental carrier frequency instead
+              of an odd-numbered subharmonic.
+              <br />
+              For this option to work as intended, the output sample rate (<a href="#r"
+                ><b>-r</b>/<b>--rate</b></a
+              >) must be suitably high (at least <i>96000</i> for JJY 40 kHz,
+              <i>176400</i> otherwise), the output hardware must support high sample rate playback
+              without &#x201C;helpfully&#x201D; filtering out the resulting ultrasound frequency,
+              and PipeWire/PulseAudio/ALSA must be configured to use the high sample rate.
+              <br />
+              Providing this option may benefit clock synchronization, but it may also
+              <b>damage audio equipment</b> over an extended period of time.
+              <br />
+              If not provided, ultrasound output is off.
+            </dd>
+            <dt id="a">
+              <a class="permalink" href="#a"><b>-a</b>, <b>--audible</b></a>
+            </dt>
+            <dd>
+              Make output waveform audible.
+              <br />
+              This reduces the frequency of the output waveform so that the user can easily hear it.
+              <br />
+              Providing this option <b>will prevent clock synchronization</b>.
+              <br />
+              If not provided, audible output is off.
+            </dd>
+          </dl>
+        </section>
+        <section class="Ss">
+          <h2 class="Ss" id="Configuration_file_options">
+            <a class="permalink" href="#Configuration_file_options">Configuration file options</a>
+          </h2>
+          <dl class="Bl-tag">
+            <dt id="C">
+              <a class="permalink" href="#C"
+                ><b>-C</b><i> CONFIG_FILE</i>, <b>--config</b>=<i>CONFIG_FILE</i></a
+              >
+            </dt>
+            <dd>
+              Load options from a file.
+              <br />
+              Options provided at the command line override those loaded from a file.
+              <br />
+              See <a href="timesignal.conf.5.html"><b>timesignal.conf</b>(5)</a> for more details on
+              the format.
+              <br />
+              If not provided, <i>/etc/timesignal.conf</i> is used if it exists.
+            </dd>
+          </dl>
+        </section>
+        <section class="Ss">
+          <h2 class="Ss" id="Logging_options">
+            <a class="permalink" href="#Logging_options">Logging options</a>
+          </h2>
+          <dl class="Bl-tag">
+            <dt id="l">
+              <a class="permalink" href="#l"
+                ><b>-l</b><i> LOG_FILE</i>, <b>--log</b>=<i>LOG_FILE</i></a
+              >
+            </dt>
+            <dd>
+              Log messages to a file.
+              <br />
+              If not provided, log messages are not emitted to a file.
+            </dd>
+            <dt id="L">
+              <a class="permalink" href="#L"><b>-L</b>, <b>--syslog</b></a>
+            </dt>
+            <dd>
+              Log messages to syslog.
+              <br />
+              If not provided, log messages are not emitted to syslog.
+            </dd>
+            <dt id="v">
+              <a class="permalink" href="#v"><b>-v</b>, <b>--verbose</b></a>
+            </dt>
+            <dd>
+              Increase logging verbosity.
+              <br />
+              This also shows more information about what is being transmitted if
+              <a href="https://github.com/kangtastic/timesignal"><b>timesignal</b></a> is running
+              within an interactive console session.
+              <br />
+              If not provided, logging verbosity is not increased.
+            </dd>
+            <dt id="q">
+              <a class="permalink" href="#q"><b>-q</b>, <b>--quiet</b></a>
+            </dt>
+            <dd>
+              Suppress logging to console.
+              <br />
+              This prevents log messages from being emitted to <i>stdout</i>/<i>stderr</i> entirely,
+              regardless of whether
+              <a href="https://github.com/kangtastic/timesignal"><b>timesignal</b></a> is running in
+              a console session.
+              <br />
+              Logging to a file and/or to syslog are not affected.
+              <br />
+              If not provided, logging to console is on.
+            </dd>
+          </dl>
+        </section>
+        <section class="Ss">
+          <h2 class="Ss" id="Miscellaneous">
+            <a class="permalink" href="#Miscellaneous">Miscellaneous</a>
+          </h2>
+          <dl class="Bl-tag">
+            <dt id="h">
+              <a class="permalink" href="#h"><b>-h</b>, <b>--help</b></a>
+            </dt>
+            <dd>Show a help message and exit.</dd>
+            <dt id="H">
+              <a class="permalink" href="#H"><b>-H</b>, <b>--longhelp</b></a>
+            </dt>
+            <dd>Show a more detailed help message and exit.</dd>
+          </dl>
+        </section>
+      </section>
+      <section class="Sh">
+        <h1 class="Sh" id="FILES"><a class="permalink" href="#FILES">FILES</a></h1>
+        <pre><i>/usr/bin/timesignal</i>
+<i>/etc/timesignal.conf</i></pre>
+      </section>
+      <section class="Sh">
+        <h1 class="Sh" id="WARNING"><a class="permalink" href="#WARNING">WARNING</a></h1>
+        <p class="Pp">
+          When using <a href="https://github.com/kangtastic/timesignal"><b>timesignal</b></a> with
+          speakers, <b>DO NOT PLACE YOUR EARS NEAR THE SPEAKERS</b>.
+        </p>
+        <p class="Pp">
+          The generated audio has full dynamic range, but is pitched high enough to be difficult to
+          perceive.
+        </p>
+        <p class="Pp">
+          <b>Even if you can't hear anything</b>, some equipment is capable of playing it back loud
+          enough to potentially cause <b>PERMANENT HEARING DAMAGE</b>.
+        </p>
+      </section>
+      <section class="Sh">
+        <h1 class="Sh" id="EXAMPLES"><a class="permalink" href="#EXAMPLES">EXAMPLES</a></h1>
+        <section class="Ss">
+          <h2 class="Ss" id="Emulate_WWVB">
+            <a class="permalink" href="#Emulate_WWVB">Emulate WWVB</a>
+          </h2>
+          <pre>
+timesignal
+</pre
+          >
+        </section>
+        <section class="Ss">
+          <h2 class="Ss" id="Emulate_JJY_60_kHz_with_verbose_logging">
+            <a class="permalink" href="#Emulate_JJY_60_kHz_with_verbose_logging"
+              >Emulate JJY 60 kHz with verbose logging</a
+            >
+          </h2>
+          <pre>
+timesignal&#x00A0;-v&#x00A0;JJY60
+</pre
+          >
+        </section>
+        <section class="Ss">
+          <h2 class="Ss" id="Emulate_DCF77_for_30_minutes,_log_to_a_file_but_not_to_console">
+            <a
+              class="permalink"
+              href="#Emulate_DCF77_for_30_minutes,_log_to_a_file_but_not_to_console"
+              >Emulate DCF77 for 30 minutes, log to a file but not to console</a
+            >
+          </h2>
+          <pre>
+timesignal&#x00A0;-t&#x00A0;30:00&#x00A0;-l&#x00A0;/var/log/timesignal.log&#x00A0;-q&#x00A0;DCF77
+</pre
+          >
+          <p class="Pp">
+            This example might be relevant to a periodically started <b>cron</b>(8) job.
+          </p>
+        </section>
+        <section class="Ss">
+          <h2 class="Ss" id="Emulate_MSF_with_a_+09:00_UTC_offset">
+            <a class="permalink" href="#Emulate_MSF_with_a_+09:00_UTC_offset"
+              >Emulate MSF with a +09:00 UTC offset</a
+            >
+          </h2>
+          <pre>
+timesignal&#x00A0;-o&#x00A0;+09:00&#x00A0;MSF
+</pre
+          >
+          <p class="Pp">
+            This example might be relevant to an overseas trip during the month of July to Sydney,
+            NSW, Australia with a watch purchased in the United Kingdom that expects to synchronize
+            to MSF.
+          </p>
+          <p class="Pp">
+            The offset is calculated as the difference between the respective timezones of the
+            clock/receiver and the time encoded within the time signal by the station/transmitter,
+            in this case AEST (UTC+10:00) and BST (UTC+01:00).
+          </p>
+          <p class="Pp">
+            Note that the offset would be +11:00 in January, as that is the time difference between
+            AEDT (UTC+11:00) and GMT (UTC+00:00)!
+          </p>
+        </section>
+      </section>
+      <section class="Sh">
+        <h1 class="Sh" id="SEE_ALSO"><a class="permalink" href="#SEE_ALSO">SEE ALSO</a></h1>
+        <p class="Pp">
+          <a href="timesignal.conf.5.html"><b>timesignal.conf</b>(5)</a>
+        </p>
+        <p class="Pp">
+          &lt;<a class="Lk" href="https://github.com/kangtastic/timesignal"
+            >https://github.com/kangtastic/timesignal</a
+          >&gt;
+        </p>
+      </section>
+    </div>
+    <table class="foot">
+      <tr>
+        <td class="foot-date">18 September 2025</td>
+        <td class="foot-os">timesignal 0.2.0</td>
+      </tr>
+    </table>
+  </body>
+</html>
