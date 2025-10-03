@@ -20,6 +20,7 @@
 #include <dlfcn.h>
 #include <unistd.h>
 
+#include <errno.h>
 #include <inttypes.h>
 #include <signal.h>
 #include <stdint.h>
