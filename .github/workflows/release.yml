@@ -1,0 +1,275 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "debian/*.*.*-*"
+
+run-name: Create GitHub Release from ${{ github.ref_name }}
+
+jobs:
+  build-amd64:
+    name: Build amd64
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: debian
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y aptitude build-essential debhelper debian-archive-keyring git-buildpackage libasound2-dev libpipewire-0.3-dev libpulse-dev pbuilder
+
+      - name: Create Debian package build environment
+        run: |
+          sudo pbuilder create --distribution bullseye --architecture amd64 --basetgz /var/cache/pbuilder/base-bullseye-amd64.tgz --mirror https://mirror.xtom.com/debian
+
+      - name: Build Debian package
+        run: |
+          BUILDER=pbuilder gbp buildpackage --git-dist=bullseye --git-arch=amd64
+          mv ../*.deb ./
+
+      - name: Extract executable binary
+        run: |
+          dpkg-deb -x *.deb ./tmp
+          mv ./tmp/usr/bin/timesignal ./timesignal-amd64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-amd64
+          path: |
+            timesignal-amd64
+            *.deb
+
+  build-arm64:
+    name: Build arm64
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: debian
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y aptitude build-essential debhelper debian-archive-keyring git-buildpackage libasound2-dev libpipewire-0.3-dev libpulse-dev pbuilder
+
+      - name: Create Debian package build environment
+        run: |
+          sudo pbuilder create --distribution bullseye --architecture arm64 --basetgz /var/cache/pbuilder/base-bullseye-arm64.tgz --mirror https://mirror.xtom.com/debian
+
+      - name: Build Debian package
+        run: |
+          BUILDER=pbuilder gbp buildpackage --git-dist=bullseye --git-arch=arm64
+          mv ../*.deb ./
+
+      - name: Extract executable binary
+        run: |
+          dpkg-deb -x *.deb ./tmp
+          mv ./tmp/usr/bin/timesignal ./timesignal-arm64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-arm64
+          path: |
+            timesignal-arm64
+            *.deb
+
+  build-armhf:
+    name: Build armhf
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: debian
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y aptitude build-essential debhelper debian-archive-keyring git-buildpackage libasound2-dev libpipewire-0.3-dev libpulse-dev pbuilder qemu-user-static
+
+      - name: Create Debian package build environment
+        run: |
+          sudo pbuilder create --distribution bullseye --architecture armhf --basetgz /var/cache/pbuilder/base-bullseye-armhf.tgz --mirror https://mirror.xtom.com/debian
+
+      - name: Build Debian package
+        run: |
+          BUILDER=pbuilder gbp buildpackage --git-dist=bullseye --git-arch=armhf
+          mv ../*.deb ./
+
+      - name: Extract executable binary
+        run: |
+          dpkg-deb -x *.deb ./tmp
+          mv ./tmp/usr/bin/timesignal ./timesignal-armhf
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-armhf
+          path: |
+            timesignal-armhf
+            *.deb
+
+  build-armhf-rpi:
+    name: Build armhf rpi
+    runs-on: ubuntu-24.04
+    env:
+      RASPIOS_IMG: https://downloads.raspberrypi.org/raspios_oldstable_lite_armhf/images/raspios_oldstable_lite_armhf-2025-05-07/2025-05-06-raspios-bullseye-armhf-lite.img.xz
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: debian
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y aptitude build-essential debhelper debian-archive-keyring git-buildpackage libasound2-dev libpipewire-0.3-dev libpulse-dev pbuilder qemu-user-static
+
+      - name: Create Debian package build environment
+        run: |
+          mkdir -p tmp/pi
+          pushd tmp
+          curl "$RASPIOS_IMG" | xzcat > raspios.img
+          LOOP_DEV=$(sudo losetup -f -P --show raspios.img)
+          sudo mount "$LOOP_DEV"p2 -o rw pi
+          sudo mount -o bind /dev pi/dev
+          sudo mount -o bind /proc pi/proc
+          sudo mount -o bind /sys pi/sys
+          sudo chroot pi apt-get update
+          sudo chroot pi apt-get -yy install aptitude
+          sudo umount pi/dev
+          sudo umount pi/proc
+          sudo umount pi/sys
+          sudo tar -C pi -zcf /var/cache/pbuilder/base-raspios-armhf.tgz .
+          sudo umount pi
+          sudo losetup -d "$LOOP_DEV"
+          popd
+          rm -rf tmp
+
+      - name: Build Debian package
+        run: |
+          BUILDER=pbuilder gbp buildpackage --git-dist=raspios --git-arch=armhf
+          mv ../*.deb ./$(basename ../*.deb .deb)-rpi.deb
+
+      - name: Extract executable binary
+        run: |
+          dpkg-deb -x *.deb ./tmp
+          mv ./tmp/usr/bin/timesignal ./timesignal-armhf-rpi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-armhf-rpi
+          path: |
+            timesignal-armhf-rpi
+            *.deb
+
+  build-riscv64:
+    name: Build riscv64
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: debian
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y aptitude build-essential debhelper debian-archive-keyring git-buildpackage libasound2-dev libpipewire-0.3-dev libpulse-dev pbuilder qemu-user-static
+
+      - name: Create Debian package build environment
+        run: |
+          sudo pbuilder create --distribution trixie --architecture riscv64 --basetgz /var/cache/pbuilder/base-trixie-riscv64.tgz --mirror https://mirror.xtom.com/debian
+
+      - name: Build Debian package
+        run: |
+          BUILDER=pbuilder gbp buildpackage --git-dist=trixie --git-arch=riscv64
+          mv ../*.deb ./
+
+      - name: Extract executable binary
+        run: |
+          dpkg-deb -x *.deb ./tmp
+          mv ./tmp/usr/bin/timesignal ./timesignal-riscv64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifacts-riscv64
+          path: |
+            timesignal-riscv64
+            *.deb
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-24.04
+    needs: [build-amd64, build-arm64, build-armhf, build-armhf-rpi, build-riscv64]
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v5
+        with:
+          merge-multiple: true
+          path: dist/
+
+      - name: Determine release version
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          echo "VERSION=$(echo "$REF_NAME" | grep -oP '\d+\.\d+\.\d+')" >> $GITHUB_ENV
+
+      - name: Compute SHA256SUMS
+        run: |
+          pushd dist
+          for f in *; do sha256sum -b "$f" >> SHA256SUMS; done
+          popd
+
+      - name: Upload GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body: |+
+            # timesignal ${{ env.VERSION }}
+
+            ## About these files
+
+            These files are automated CI builds against Debian 11 and glibc 2.31 compatible with most Linux distributions released in 2020 or later.
+
+            Files starting with `timesignal-` are standalone executable binaries.
+
+            Files ending with  `.deb` are installable packages for Debian and Debian derivatives such as Ubuntu.
+
+            ### Note for RISC-V users
+
+            As old versions of Debian lack RISC-V support, RISC-V files are built against Debian 13 and glibc 2.41 for distributions released in 2025 or later.
+
+            ### Note for Raspberry Pi users
+
+            Users of 32-bit versions of Raspbian/Raspberry Pi OS should download `armhf-rpi` files instead of `armhf` files.
+            ([Why?](https://wiki.debian.org/Multiarch/Tuples#Unsolved_problems))
+
+            Users of 64-bit Raspbian/Raspberry Pi OS may use `arm64` files as usual.
+
+            ## Changelog
+
+          files: dist/*
+          tag_name: ${{ env.VERSION }}
+          generate_release_notes: true
