@@ -1,0 +1,5 @@
+.debhelper/*
+timesignal/*
+debhelper-build-stamp
+files
+timesignal.substvars

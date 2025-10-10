@@ -1,0 +1,9 @@
+#!/bin/sh
+
+set -e
+
+if [ "$1" = "purge" ] && [ -f "/etc/timesignal.conf" ]; then
+  rm -f "/etc/timesignal.conf"
+fi
+
+#DEBHELPER#

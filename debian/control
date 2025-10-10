@@ -1,0 +1,28 @@
+Source: timesignal
+Section: utils
+Priority: optional
+Maintainer: James Seo <james@equiv.tech>
+Rules-Requires-Root: no
+Build-Depends: debhelper-compat (= 12), libpipewire-0.3-dev, libpulse-dev,
+ libasound2-dev, pkgconf
+Standards-Version: 4.6.0
+Homepage: https://github.com/kangtastic/timestation
+
+Package: timesignal
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, pipewire | pulseaudio | libasound2
+Description: Radio time signal broadcast emulator
+ timesignal emulates radio time signal broadcasts from BPC, DCF77, JJY, MSF,
+ and WWVB.
+ .
+ The vast majority of all radio-controlled clocks and watches (often marketed
+ as "atomic clocks") rely a time signal broadcast from one of these five
+ stations. However, these broadcasts are limited in geographic range and
+ notoriously prone to interference in urban areas, so many such clocks end up
+ never actually using their self-setting functionality.
+ .
+ timesignal may allow setting such clocks when/where a suitable signal is not
+ otherwise available by generating an audio waveform intentionally crafted to
+ create, when played back through consumer-grade audio hardware, the right
+ kind of radio frequency (RF) noise to be mistaken for a time signal
+ broadcast.
