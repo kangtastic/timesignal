@@ -42,9 +42,58 @@ clocks when/where a suitable signal is not otherwise available.
 
 ## Installation
 
-Standalone binaries and `.deb` packages are on the way.
+Standalone binaries and `.deb` packages are available on the
+[Releases](https://github.com/kangtastic/timesignal/releases) page.
 
-In the meantime, see [Building from source](#building-from-source).
+Download the correct binary or package for the CPU architecture of the computer
+on which **timesignal** will be installed:
+
+| Filename contains| Architecture | Examples (not exhaustive) |
+| - | - | - |
+| `amd64` | x86-64 | Most ordinary desktops, laptops, mini PCs, and servers |
+| `arm64` | AArch64 | Single-board computers (SBCs) based on ARMv8/ARMv9 CPUs<br>Raspberry Pi devices running any <u>**64-bit**</u> OS |
+| `armhf` | Newer AArch32 | Older SBCs based on ARMv7 CPUs<br>Raspberry Pi devices running a <u>**32-bit**</u> OS that is <u>**not**</u> Raspberry Pi OS |
+| `armhf-rpi` | Older AArch32 | Even older SBCs based on ARMv6 CPUs with VFP2<br>Raspberry Pi devices running <u>**32-bit**</u> Raspberry Pi OS |
+| `riscv64` | RISC-V 64-bit | SBCs based on RISC-V CPUs<br>StarFive VisionFive 2
+
+If the provided binaries/packages are not suitable, see
+[Building from source](#building-from-source).
+
+### Standalone binaries
+
+A standalone binary does not require formal installation, but it must have
+execute permissions added to it at the filesystem level before it can be run.
+
+For an `amd64` binary named `timesignal-amd64`, this may be accomplished with:
+
+```sh
+chmod +x timesignal-amd64
+```
+
+The binary may then be run with:
+
+```sh
+./timesignal-amd64
+```
+
+### Packages
+
+For an `amd64` package named `timesignal_0.2.0-1_amd64.deb`:
+
+```sh
+sudo apt install timesignal_0.2.0-1_amd64.deb
+```
+
+Many systems also support installing `.deb` packages via a graphical installer
+of some sort, perhaps by simply opening the package file in a file manager. The
+exact method varies between systems and is beyond the scope of this document.
+
+After installation from a package, **timesignal** may be run with:
+
+```sh
+timesignal
+```
+
 
 ## Usage
 
@@ -54,7 +103,7 @@ In the meantime, see [Building from source](#building-from-source).
 timesignal [OPTION]... [STATION]
 ```
 
-#### Quick option reference
+### Quick option reference
 
 <details>
 <summary>click to expand/hide</summary>
@@ -185,6 +234,7 @@ DAC during playback will then be the original fundamental, which should leak to
 the environment as a short-range radio transmission via the ad-hoc antenna
 formed by the physical wires and circuit traces in the audio output path.</p>
 </details>
+
 
 ## Building from source
 
